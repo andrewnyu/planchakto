@@ -13,7 +13,7 @@ from .rules import RULES
 from .structure import CATALOG
 from .geometry import parse_survey,validate_site
 from .layout import generate_layouts
-from .ai import AIRequest,interpret,configured
+from .ai import AIRequest,interpret,status
 
 app=FastAPI(title='BuildGraph',version='0.1.0')
 _store=None
@@ -41,12 +41,12 @@ class SurveyRequest(Model):
 class ImportRequest(Model):model:Building
 
 @app.get('/api/health')
-def health():return {'status':'ok','engine_version':ENGINE_VERSION,'gemini_configured':configured(),'storage':os.getenv('BUILDGRAPH_STORAGE','local'),'scope':'single-storey orthogonal prototype'}
+def health():return {'status':'ok','engine_version':ENGINE_VERSION,**status(),'storage':os.getenv('BUILDGRAPH_STORAGE','local'),'scope':'single-storey orthogonal prototype'}
 @app.get('/api/project')
 def project():
     state=store().state();s=store().get(state['head'])
     s['results']['stale']=s['results']['input_hash']!=digest(s['model']) or s['results'].get('engine_version')!=ENGINE_VERSION
-    return {'state':state,'accepted':s,'revisions':store().list(),'gemini_configured':configured(),'sections':CATALOG}
+    return {'state':state,'accepted':s,'revisions':store().list(),**status(),'sections':CATALOG}
 @app.get('/api/revisions/{id}')
 def revision(id:str):return store().get(id)
 @app.post('/api/commands')
@@ -87,10 +87,10 @@ def ai(req:AIRequest):
     s=store().get(req.revision_id)
     try:plan=interpret(req,s)
     except RuntimeError as e:return JSONResponse(status_code=503,content={'detail':str(e),'mode':'unavailable'})
-    except Exception as e:return JSONResponse(status_code=502,content={'detail':f'Gemini request or validation failed ({type(e).__name__}). No changes were applied.','mode':'error'})
+    except Exception as e:return JSONResponse(status_code=502,content={'detail':f'AI request or validation failed ({type(e).__name__}). No changes were applied.','mode':'error'})
     response={'mode':'live','interpretation':plan.model_dump(),'candidate':None,'evidence':None}
     if plan.action=='edit':
-        candidate=store().preview(CommandRequest(base_revision=req.revision_id,command_id=uuid.uuid4().hex,label='Gemini proposed edit',commands=plan.commands));response['candidate']=candidate
+        candidate=store().preview(CommandRequest(base_revision=req.revision_id,command_id=uuid.uuid4().hex,label='Assistant proposed edit',commands=plan.commands));response['candidate']=candidate
         response['evidence']={'summary':candidate['results']['summary'],'invalidated':candidate['invalidated'],'comparison':compare(s['results'],candidate['results'],s['model'],candidate['model'])}
     elif plan.action=='analyze':response['candidate']=store().rerun(req.revision_id)
     elif plan.action=='alternatives':response['evidence']=layouts(req.revision_id)

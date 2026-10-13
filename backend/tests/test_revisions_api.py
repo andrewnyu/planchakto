@@ -9,7 +9,7 @@ import backend.main as main
 def store(tmp_path):return LocalStore(str(tmp_path/'test.sqlite3'))
 @pytest.fixture
 def client(store,monkeypatch):
-    monkeypatch.setattr(main,'_store',store);monkeypatch.delenv('GEMINI_API_KEY',raising=False)
+    monkeypatch.setattr(main,'_store',store);monkeypatch.delenv('GEMINI_API_KEY',raising=False);monkeypatch.delenv('OPENROUTER_API_KEY',raising=False);monkeypatch.delenv('BUILDGRAPH_AI_PROVIDER',raising=False)
     return TestClient(main.app)
 def request(base,id='cmd1',load=1.5):return CommandRequest(base_revision=base,command_id=id,label='Load update',commands=[{'type':'set_parameter','field':'live','value':load}])
 
@@ -75,3 +75,39 @@ def test_ai_plan_evaluation_contract(action,commands,revision,valid):
     if valid:assert validate_plan(plan,req)==plan
     else:
         with pytest.raises(ValueError):validate_plan(plan,req)
+
+import json,backend.ai as ai
+AI_ENV=('GEMINI_API_KEY','GEMINI_MODEL','OPENROUTER_API_KEY','OPENROUTER_MODEL','BUILDGRAPH_AI_PROVIDER')
+@pytest.mark.parametrize('env,expected',[
+    ({},None),
+    ({'GEMINI_API_KEY':'k'},None),
+    ({'OPENROUTER_API_KEY':'k','OPENROUTER_MODEL':'m'},'openrouter'),
+    ({'GEMINI_API_KEY':'k','GEMINI_MODEL':'g','OPENROUTER_API_KEY':'k','OPENROUTER_MODEL':'m'},'gemini'),
+    ({'GEMINI_API_KEY':'k','GEMINI_MODEL':'g','OPENROUTER_API_KEY':'k','OPENROUTER_MODEL':'m','BUILDGRAPH_AI_PROVIDER':'openrouter'},'openrouter'),
+    ({'GEMINI_API_KEY':'k','GEMINI_MODEL':'g','BUILDGRAPH_AI_PROVIDER':'openrouter'},None),
+])
+def test_ai_provider_selection(monkeypatch,env,expected):
+    for k in AI_ENV:monkeypatch.delenv(k,raising=False)
+    for k,v in env.items():monkeypatch.setenv(k,v)
+    assert ai.status()['ai_provider']==expected
+
+def test_openrouter_response_is_validated_like_gemini(client,monkeypatch):
+    for k in AI_ENV:monkeypatch.delenv(k,raising=False)
+    monkeypatch.setenv('OPENROUTER_API_KEY','k');monkeypatch.setenv('OPENROUTER_MODEL','test/model')
+    head=client.get('/api/project').json()['state']['head'];sent={}
+    class Resp:
+        def __init__(self,content):self.content=content
+        def raise_for_status(self):pass
+        def json(self):return {'choices':[{'message':{'content':self.content}}]}
+    def fake_post(url,**kw):
+        sent.update(url=url,body=kw['json'],auth=kw['headers']['Authorization'])
+        return Resp('```json\n'+json.dumps({'revision_id':head,'action':'inspect','explanation':'Read-only review'})+'\n```')
+    import httpx;monkeypatch.setattr(httpx,'post',fake_post)
+    assert client.get('/api/health').json()['ai_provider']=='openrouter'
+    r=client.post('/api/ai',json={'revision_id':head,'message':'What fails?'})
+    assert r.status_code==200 and r.json()['interpretation']['action']=='inspect' and r.json()['candidate'] is None
+    assert sent['url']==ai.OPENROUTER_URL and sent['auth']=='Bearer k' and sent['body']['model']=='test/model'
+    assert '"AIPlan"' in sent['body']['messages'][0]['content'] and 'temperature' not in sent['body']
+    monkeypatch.setattr(httpx,'post',lambda *a,**k:Resp(json.dumps({'revision_id':'stale','action':'inspect','explanation':'x'})))
+    r=client.post('/api/ai',json={'revision_id':head,'message':'What fails?'})
+    assert r.status_code==502 and r.json()['mode']=='error'
