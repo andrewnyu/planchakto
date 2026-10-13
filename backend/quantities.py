@@ -23,6 +23,9 @@ def takeoff(b,structure,routing,solar=None):
         data['pv_modules']=(pv['count'],mods,'count of modules placed inside the roof edge setback')
         data['pv_racking']=(pv['area_m2'],mods,'Σ module areas; racking priced per m² of array')
         data['pv_inverter']=(1 if b.solar.inverter_kw else 0,['pv-inverter'],'one inverter at the entered AC rating')
+    if b.fire.enabled:
+        data['fire_extinguishers']=(len(b.fire.extinguishers),[e.id for e in b.fire.extinguishers],'count of modeled portable extinguishers')
+        data['fire_exits']=(len(b.fire.exits),[e.id for e in b.fire.exits],'count of added exterior exit doors')
     for kind in ['water','drain','conduit']:data[kind]=(sum(r['length'] for r in route_items(kind)),[r['id'] for r in route_items(kind)],'Σ physical polyline lengths; dedicated home runs')
     items=[]
     for rate in b.rates:

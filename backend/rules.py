@@ -1,16 +1,17 @@
 """Versioned illustrative checks. No unconsulted Philippine code clauses."""
 from .domain import digest
 from .solar import SOURCES as SOLAR_SOURCES
+from .fire import SOURCE as FIRE_SOURCE
 
 SOURCES={
  'beam':'Euler–Bernoulli beam theory; stiffness implementation and closed-form validation in docs/ENGINEERING.md. Not a code clause.',
  'project':'User-entered demonstration criterion; source supplied with project. Not a statutory requirement.',
  'geometry':'Euclidean geometry; implemented predicates in backend/geometry.py and backend/routing.py.',
  'code':'Authoritative Philippine code text and project applicability not supplied; no code clauses asserted.',
- 'pv-ocpd':SOLAR_SOURCES['ocpd'],'pv-busbar':SOLAR_SOURCES['busbar'],'pv-net':SOLAR_SOURCES['netmeter'],'pv-host':SOLAR_SOURCES['hosting'],'pv-xfmr':SOLAR_SOURCES['transformer']}
+ 'pv-ocpd':SOLAR_SOURCES['ocpd'],'pv-busbar':SOLAR_SOURCES['busbar'],'pv-net':SOLAR_SOURCES['netmeter'],'pv-host':SOLAR_SOURCES['hosting'],'pv-xfmr':SOLAR_SOURCES['transformer'],'fire':FIRE_SOURCE}
 
 def make_rule(id,name,source,required,formula,units,scope):
-    return {'id':id,'version':'1.0.0','name':name,'source':SOURCES[source],'edition':'BuildGraph 0.1 / 2026-10-13','reference':formula,'jurisdiction':'Cited PH source — verify against the current official edition' if source.startswith('pv-') else 'Project-specific illustrative criterion; not verified PH regulation','applicability':scope,'required_inputs':required,'formula':formula,'units':units,'tolerance':1e-6,'review_status':'Numerically benchmarked' if source=='beam' else 'Prototype / professional review required','exclusions':'Whole-building compliance, stability and construction certification'}
+    return {'id':id,'version':'1.0.0','name':name,'source':SOURCES[source],'edition':'BuildGraph 0.1 / 2026-10-13','reference':formula,'jurisdiction':'Cited PH source — verify against the current official edition' if source.startswith('pv-') or source=='fire' else 'Project-specific illustrative criterion; not verified PH regulation','applicability':scope,'required_inputs':required,'formula':formula,'units':units,'tolerance':1e-6,'review_status':'Numerically benchmarked' if source=='beam' else 'Prototype / professional review required','exclusions':'Whole-building compliance, stability and construction certification'}
 
 RULES=[
  make_rule('LAYOUT','Room geometry & access','geometry',['room rectangles','door graph','boundary','setback'],'containment ∧ disjoint interiors ∧ area ranges ∧ door access','m, m²','Rectangular rooms and fixed corridor'),
@@ -29,10 +30,23 @@ RULES=[
  make_rule('PV-XFMR','Transformer loading & reverse flow','pv-xfmr',['transformer kVA','circuit demand','inverter kW'],'max(Σ demand/pf, P_inv) ≤ S_transformer','kVA','Arithmetic screen; not a Distribution Impact Study'),
  make_rule('PV-HOSTING','DU hosting capacity','pv-host',['DU hosting capacity per transformer','inverter kW'],'P_inv ≤ hosting capacity','kW','DU-published value required'),
  make_rule('PV-NETMETER','Net-metering capacity cap','pv-net',['array kWp','customer class','contracted capacity'],'kWp ≤ 100 kW (residential) or min(1 MW, contracted) (non-residential)','kW','Eligibility screen only'),
+ make_rule('FIRE-OCCLOAD','Occupant load','fire',['gross floor area','occupancy'],'ceil(area / m² per person)','persons','Business / mercantile, single storey'),
+ make_rule('FIRE-EXITS','Number of exits','fire',['exits','occupant load','travel distance'],'exits ≥ 2 per storey (3 > 500, 4 > 1,000) unless a single-exit allowance applies','count','Exterior exit doors on the building perimeter'),
+ make_rule('FIRE-TRAVEL','Travel distance to exit','fire',['rooms','doors','exits','sprinklers'],'max over floor of shortest door-constrained path ≤ limit','m','0.25 m grid, 8-connected, furniture ignored'),
+ make_rule('FIRE-DEADEND','Dead-end corridors','fire',['corridor','exits'],'corridor length reaching an exit in one direction only ≤ limit','m','Straight corridors, exits at the corridor'),
+ make_rule('FIRE-COMMON','Common path of travel','fire',['exits','routes'],'shared prefix of routes to the two nearest exits ≤ limit (tree-metric approximation)','m','Approximation; single exit = full travel'),
+ make_rule('FIRE-CAPACITY','Exit capacity','fire',['occupant load','exit widths'],'Σ exit width ≥ occupants × 5.0 mm','m','Level egress components'),
+ make_rule('FIRE-CORRIDOR','Corridor width','fire',['corridor width','occupant load'],'clear width ≥ 1.12 m when ≥ 50 occupants','m','Business occupancy'),
+ make_rule('FIRE-SPRINKLER','Automatic sprinkler trigger','fire',['height','gross area','occupancy'],'required by height/area trigger ⇒ provided','—','Single storey'),
+ make_rule('FIRE-ALARM','Fire alarm','fire',['occupancy','occupant load','class'],'required system ⇒ provided','—','New/existing thresholds'),
+ make_rule('FIRE-EMLIGHT','Emergency lighting','fire',['occupancy','class','storeys'],'triggered ⇒ provided','—','Single storey'),
+ make_rule('FIRE-SIGNS','Exit signs','fire',['exit signs'],'provided','—','All business and mercantile'),
+ make_rule('FIRE-EXT','Portable extinguishers','fire',['extinguisher positions & ratings','hazard'],'count ≥ area / max area; door-constrained travel ≤ Table 7 limit; rating ≥ minimum','m, m²','Class A hazards'),
+ make_rule('FIRE-SCOPE','Fire protection coverage','fire',[],'not evaluated','n/a','Outside the supported screen'),
  make_rule('PH-CODE','Philippine code coverage','code',[],'not evaluated','n/a','Code edition and authoritative rule library unavailable'),
 ]
 
-def evaluate_rules(b,structure,layout,routing,fitout,rev,solar=None):
+def evaluate_rules(b,structure,layout,routing,fitout,rev,solar=None,fire=None):
     results=[]
     def add(rule,status,objects,evidence,inputs=None):
         results.append({'id':f'{rule}-{len(results)}','rule_id':rule,'rule_version':'1.0.0','revision_id':rev,'status':status,'objects':objects,'evidence':evidence,'inputs':inputs or {},'explanation':evidence})
@@ -50,6 +64,8 @@ def evaluate_rules(b,structure,layout,routing,fitout,rev,solar=None):
     for c in routing['circuits']:add('ELECTRICAL',c['status'],c['equipment_ids'],f"{c['connected_W']} W connected; {c['current_A']} A calculated. {c['coverage']}",c)
     if solar and solar['enabled']:
         for c in solar['checks']:add(c['rule'],c['status'],[m['id'] for m in solar['layout']['modules']] or ['solar-array'],c['evidence'],c['inputs'])
+    if fire and fire['enabled']:
+        for c in fire['checks']:add(c['rule'],c['status'],[b.id],f"{c['evidence']} [{c['clause']}]",c['inputs'])
     add('PH-CODE','unsupported',[b.id],'No Philippine statutory rules are verified. This is preliminary planning and review support, requiring appropriate professional review for construction and approval.')
     for name in ['Whole-building stability, wind and seismic','Steel column buckling and connections','Foundation uplift, eccentric contact, settlement, sliding, overturning, punching and reinforcement','Electrical protection, conductor sizing and voltage drop','Plumbing hydraulic sizing, venting and pipe diameter adequacy']:
         add('PH-CODE','unsupported',[b.id],f'{name}: not evaluated by the supported analytical family.')

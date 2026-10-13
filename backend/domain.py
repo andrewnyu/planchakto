@@ -127,7 +127,7 @@ class Solar(Model):
     racking_mass: float = Field(default=4, ge=0, le=50)  # kg/m² of array
     module_source: str = 'Synthetic datasheet values — replace with the specified module'
     edge_setback: float = Field(default=.6, ge=0, le=5)
-    setback_source: str = 'User demonstration criterion; no verified PH roof-access rule'
+    setback_source: str = 'User criterion. RA 9514 RIRR 10.2.19.9 (Solar PV) sets no rooftop pathway or edge setback dimension.'
     inverter_kw: float | None = Field(default=5, gt=0, le=2000)
     phases: Literal[1,3] = 1
     voltage: float = Field(default=230, gt=0)  # line-neutral for 1-phase, line-line for 3-phase
@@ -140,6 +140,34 @@ class Solar(Model):
     hosting_capacity_kw: float | None = Field(default=None, ge=0)
     customer_class: Literal['residential','non_residential'] = 'residential'
     contracted_kw: float | None = Field(default=None, gt=0)
+
+class ExitDoor(Model):
+    id: str
+    wall: Literal['north','south','east','west']
+    offset: float = Field(ge=0)  # metres along the wall from its lower x/y corner
+    width: float = Field(default=.9, gt=0, le=4)
+
+class Extinguisher(Model):
+    id: str
+    room_id: str
+    dx: float
+    dy: float
+    rating: Literal['2-A','3-A','4-A'] = '2-A'
+
+class FireProtection(Model):
+    """Optional RA 9514 (2019 RIRR) screen for business and mercantile occupancies; see backend/fire.py."""
+    enabled: bool = False
+    occupancy: Literal['business','business_concentrated','mercantile'] = 'business'
+    new_building: bool = True
+    sprinklered: bool = False  # approved, supervised automatic sprinkler system throughout
+    alarm: Literal['none','manual','automatic'] = 'none'
+    emergency_lighting: bool = False
+    exit_signs: bool = False
+    hazard: Literal['low','moderate','high'] = 'low'  # contents hazard for extinguisher Table 7
+    exits: list[ExitDoor] = []
+    extinguishers: list[Extinguisher] = []
+    mercantile_travel_m: float | None = Field(default=None, gt=0)  # unsprinklered base limit; not located in 10.2.15.2
+    mercantile_travel_source: str = 'Not located: RIRR 10.2.15.2 ¶6 defers to 10.2.5.2. Enter the value the C/MFM applies.'
 
 class Rate(Model):
     id: str
@@ -181,6 +209,7 @@ class Building(Model):
     engineering: Engineering = Field(default_factory=Engineering)
     brief: Brief = Field(default_factory=Brief)
     solar: Solar = Field(default_factory=Solar)
+    fire: FireProtection = Field(default_factory=FireProtection)
     rates: list[Rate]
     routing_mode: Literal['direct','avoid'] = 'avoid'
     @model_validator(mode='after')
@@ -193,6 +222,12 @@ class Building(Model):
             if item.room_id not in rooms: raise ValueError(f'Unknown room {item.room_id}')
         for item in self.equipment:
             if item.circuit_id not in circuits: raise ValueError(f'Unknown circuit {item.circuit_id}')
+        for item in self.fire.extinguishers:
+            if item.room_id not in rooms: raise ValueError(f'Unknown room {item.room_id}')
+        for door in self.fire.exits:
+            if door.offset+door.width>(self.depth if door.wall in ['east','west'] else self.width)+1e-9: raise ValueError(f'Exit {door.id} extends beyond its wall')
+        fire_ids=[x.id for x in self.fire.exits+self.fire.extinguishers]
+        if len(fire_ids)!=len(set(fire_ids)) or set(fire_ids)&set(ids): raise ValueError('Fire protection identifiers must be unique')
         for grid,maximum in [(self.grid_x,self.width),(self.grid_y,self.depth)]:
             if len(grid)<2 or grid != sorted(set(grid)) or grid[0]!=0 or grid[-1]!=maximum: raise ValueError('Grid must increase strictly from 0 to building extent')
         for p in (self.engineering.dead,self.engineering.live,self.engineering.soil):
@@ -278,6 +313,9 @@ class AddElement(Model):
 class SetSolar(Model):
     type: Literal['set_solar']
     solar: Solar
+class SetFire(Model):
+    type: Literal['set_fire']
+    fire: FireProtection
 class SetRoomRequirements(Model):
     type: Literal['set_room_requirements']
     room_id: str
@@ -285,7 +323,7 @@ class SetRoomRequirements(Model):
     max_area: float = Field(gt=0)
     min_dimension: float = Field(gt=0)
 
-Command = Annotated[MoveRoom|SwapRooms|SetParameter|RemoveColumn|SetEquipment|SetLock|Reroute|SetBrief|SetSite|SetRate|SetGrid|MoveFurniture|MoveFixture|MoveEquipment|AddElement|SetRoomRequirements|SetSolar,Field(discriminator='type')]
+Command = Annotated[MoveRoom|SwapRooms|SetParameter|RemoveColumn|SetEquipment|SetLock|Reroute|SetBrief|SetSite|SetRate|SetGrid|MoveFurniture|MoveFixture|MoveEquipment|AddElement|SetRoomRequirements|SetSolar|SetFire,Field(discriminator='type')]
 class CommandRequest(Model):
     base_revision: str
     command_id: str = Field(min_length=1,max_length=128)
@@ -302,7 +340,8 @@ DEPENDENCIES={
  'set_site':['terrain','layout','routing','quantities'],
  'set_rate':['quantities','budget'], 'set_grid':['geometry','structure','foundations','routing','quantities'],
  'move_furniture':['fitout','routing','quantities'], 'move_fixture':['routing','quantities'], 'move_equipment':['routing','electrical','quantities'], 'add_element':['routing','electrical','fitout','quantities'], 'set_room_requirements':['layout'],
- 'set_solar':['solar','structure','foundations','electrical','quantities']}
+ 'set_solar':['solar','structure','foundations','electrical','quantities'],
+ 'set_fire':['fire','egress','quantities']}
 
 def digest(value):
     if isinstance(value,BaseModel): value=value.model_dump(mode='json')
@@ -366,6 +405,7 @@ def apply_commands(model: Building, commands:list[Command]):
                 b.equipment.append(Equipment(id=cmd.id,name=cmd.name,room_id=cmd.room_id,dx=cmd.dx,dy=cmd.dy,watts=cmd.watts,circuit_id=cmd.circuit_id,source='User-entered nameplate rating'))
             else:b.furniture.append(Furniture(id=cmd.id,name=cmd.name,room_id=cmd.room_id,dx=cmd.dx,dy=cmd.dy,w=cmd.w,h=cmd.h))
         elif isinstance(cmd,SetSolar):b.solar=cmd.solar
+        elif isinstance(cmd,SetFire):b.fire=cmd.fire
         elif isinstance(cmd,SetRoomRequirements):
             if cmd.max_area<cmd.min_area:raise ValueError('Maximum area must be at least minimum area')
             r=obj(b.rooms,cmd.room_id);r.min_area=cmd.min_area;r.max_area=cmd.max_area;r.min_dimension=cmd.min_dimension

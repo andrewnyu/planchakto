@@ -27,3 +27,11 @@
 .solar-edit .assumption-box,.solar-edit .button{grid-column:1/-1}
 .pv-module{cursor:pointer}
 @media (max-width:760px){.solar-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* Fire protection */
+.solar-edit fieldset.wide{grid-column:1/-1}
+.solar-edit legend small{text-transform:none;letter-spacing:0;font-weight:400}
+.check-field{display:flex;align-items:center;gap:8px;font-size:11px;color:#67725e;margin:0 0 10px}
+.row-fields{display:grid;grid-template-columns:minmax(90px,1fr) minmax(90px,1fr) minmax(90px,1fr) auto auto;gap:6px;align-items:center;margin:0 0 6px}
+.row-fields select{font-size:11px;padding:7px}
+@media (max-width:760px){.row-fields{grid-template-columns:1fr 1fr}}
