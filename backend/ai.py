@@ -37,7 +37,7 @@ def validate_plan(plan:AIPlan,request:AIRequest):
     if plan.revision_id!=request.revision_id:raise ValueError('The assistant targeted an outdated or different revision')
     if plan.action=='edit' and not plan.commands:raise ValueError('No typed edits returned')
     if plan.action!='edit' and plan.commands:raise ValueError('Read-only action cannot contain edits')
-    if any(c.type in ['set_lock','set_site','set_grid','set_brief','set_rate'] for c in plan.commands):raise ValueError('This operation requires the explicit manual editor; the assistant cannot change locks, site data, grid, brief or rates')
+    if any(c.type in ['set_lock','set_site','set_grid','set_brief','set_rate','set_solar'] for c in plan.commands):raise ValueError('This operation requires the explicit manual editor; the assistant cannot change locks, site data, grid, brief, rates or solar/utility inputs')
     return plan
 
 def _gemini(payload):

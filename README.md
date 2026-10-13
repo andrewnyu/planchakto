@@ -16,6 +16,7 @@ Built for small PH architecture and engineering teams iterating on a modest sing
   - **Layout:** a CP-SAT solver (OR-Tools) generates room arrangements around a fixed corridor, honouring locks, adjacency and door access, with transparent scores.
   - **Fit-out and PH code:** checks with explicit source references. Each check reports `pass`, `fail`, `missing_input` or `unsupported`, and missing inputs can never pass.
 - **Price it.** The quantity takeoff is derived from geometry and priced with editable rates (₱). You get a cost delta between the accepted design and each candidate.
+- **Solar PV (optional).** Packs modules on the roof inside an edge setback and adds their dead load (module + racking) to the roof beams under the array, so the existing deflection, stress and bearing checks re-run with PV included. It sizes the inverter output breaker (125% rule) and screens the busbar 120% rule, transformer loading and worst-case reverse flow, DU hosting capacity, and the net-metering cap. Regulatory values carry their source and a verify flag. Values only the distribution utility can supply (transformer kVA, hosting capacity) stay `missing_input` until entered. Wind uplift is reported as unsupported.
 - **Site.** Import a survey CSV and a boundary, triangulate the terrain, and validate the site.
 - **AI assistant (optional).** Plain-language requests ("move the bathroom next to the kitchen", "raise the roof live load to 1.5 kPa") become **typed commands**. They go through exactly the same validation pipeline as manual edits and always land as a candidate for review. The assistant cannot change locks, site, grid, brief or rates.
 - **Revisions.** Undo and redo, branchable revision history, and import/export of a project as JSON. Quantities export as CSV, and there is a printable HTML report.
@@ -107,6 +108,7 @@ backend/
   routing.py      electrical / plumbing routing and slopes
   layout.py       CP-SAT room layout alternatives
   quantities.py   takeoff, pricing, revision comparison
+  solar.py        PV array fit, roof load, service & grid screens
   rules.py        rule catalogue with sources
   ai.py           Gemini / OpenRouter interpreter + plan validation
   store.py        SQLite revision store (cloud_store.py for GCP)
@@ -114,6 +116,7 @@ frontend/src/
   App.tsx         workspace, tabs, inspector, assistant
   Plan.tsx        2D SVG plan
   Model3D.tsx     Three.js model (lazy-loaded)
+  Solar.tsx       solar PV results and inputs (Engineering tab)
 examples/         demo project, survey, boundary, coordinated variant
 scripts/          dev server, benchmark, fixtures, Gemini check
 docs/             implementation plan, benchmark results

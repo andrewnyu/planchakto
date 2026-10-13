@@ -10,3 +10,20 @@
 .rail{color:#b0c4b5}.rail button{color:#aec5b6}.rail button.active{color:#f1f5e7}.rail .brand-mark{color:#edf1e6}.avatar{color:#e3eadb}.toast{color:#f2f6e9}.brand-mark{color:#e7eddf}.rail button:hover{color:#fff}
 .mobile-inspector-button,.mobile-inspector-close{display:none!important}
 @media(max-width:720px){.mobile-inspector-button{display:inline-flex!important}.inspector.mobile-open{display:flex;position:fixed;right:0;top:70px;bottom:0;width:280px;z-index:20;box-shadow:-8px 0 30px #253b2220}.mobile-inspector-close{display:inline-flex!important}.inspector-tabs{gap:17px}.inspector-tabs>.icon-button:last-child{display:none}}
+
+/* Solar PV */
+.solar-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:6px;overflow:hidden;margin:0 0 16px}
+.solar-stats>div{background:white;padding:12px 14px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.solar-stats span{font-size:10px;color:var(--muted)}
+.solar-stats strong{font-size:18px;font-weight:500;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.solar-stats strong small{font-size:10px;font-weight:400;color:var(--muted);letter-spacing:0}
+.solar-stats>div>small{font-size:10px;color:var(--muted);overflow-wrap:anywhere}
+.solar-source{display:block;margin-top:4px;font-size:9px;line-height:1.45;color:var(--muted)}
+.solar-edit{margin:6px 0 24px;border:1px solid var(--line);border-radius:6px;background:white}
+.solar-edit summary{cursor:pointer;padding:11px 14px;font-size:11px;font-weight:500}
+.solar-edit form{padding:4px 14px 14px;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:4px 18px}
+.solar-edit fieldset{border:0;padding:0;margin:0;min-width:0}
+.solar-edit legend{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:10px 0 8px}
+.solar-edit .assumption-box,.solar-edit .button{grid-column:1/-1}
+.pv-module{cursor:pointer}
+@media (max-width:760px){.solar-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}

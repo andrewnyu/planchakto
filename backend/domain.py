@@ -116,6 +116,31 @@ class Engineering(Model):
     wind: Parameter = Field(default_factory=lambda: Parameter(value=None, unit='kPa', basis='unsupported — unused by solver'))
     seismic: Parameter = Field(default_factory=lambda: Parameter(value=None, unit='g', basis='unsupported — unused by solver'))
 
+class Solar(Model):
+    """Optional rooftop PV. Every regulatory value is an editable input with its source; see backend/solar.py."""
+    enabled: bool = False
+    target_kwp: float | None = Field(default=6, gt=0, le=2000)  # None fills the available roof
+    module_watts: float = Field(default=590, gt=0, le=1000)
+    module_length: float = Field(default=2.278, gt=0, le=3)
+    module_width: float = Field(default=1.134, gt=0, le=2)
+    module_mass: float = Field(default=28, gt=0, le=100)  # kg per module
+    racking_mass: float = Field(default=4, ge=0, le=50)  # kg/m² of array
+    module_source: str = 'Synthetic datasheet values — replace with the specified module'
+    edge_setback: float = Field(default=.6, ge=0, le=5)
+    setback_source: str = 'User demonstration criterion; no verified PH roof-access rule'
+    inverter_kw: float | None = Field(default=5, gt=0, le=2000)
+    phases: Literal[1,3] = 1
+    voltage: float = Field(default=230, gt=0)  # line-neutral for 1-phase, line-line for 3-phase
+    peak_sun_hours: float = Field(default=4.8, gt=0, le=12)
+    performance_ratio: float = Field(default=.8, gt=0, le=1)
+    yield_source: str = 'Indicative PH planning values (4.8 h/day, PR 0.8); not a site irradiance study'
+    service_main_a: float | None = Field(default=60, gt=0)
+    busbar_a: float | None = Field(default=100, gt=0)
+    transformer_kva: float | None = Field(default=None, gt=0)
+    hosting_capacity_kw: float | None = Field(default=None, ge=0)
+    customer_class: Literal['residential','non_residential'] = 'residential'
+    contracted_kw: float | None = Field(default=None, gt=0)
+
 class Rate(Model):
     id: str
     name: str
@@ -155,6 +180,7 @@ class Building(Model):
     site: Site
     engineering: Engineering = Field(default_factory=Engineering)
     brief: Brief = Field(default_factory=Brief)
+    solar: Solar = Field(default_factory=Solar)
     rates: list[Rate]
     routing_mode: Literal['direct','avoid'] = 'avoid'
     @model_validator(mode='after')
@@ -249,6 +275,9 @@ class AddElement(Model):
     fixture_kind: Literal['sink','wc','basin'] = 'basin'
     w: float = Field(default=1.2,gt=0,le=5)
     h: float = Field(default=.6,gt=0,le=5)
+class SetSolar(Model):
+    type: Literal['set_solar']
+    solar: Solar
 class SetRoomRequirements(Model):
     type: Literal['set_room_requirements']
     room_id: str
@@ -256,7 +285,7 @@ class SetRoomRequirements(Model):
     max_area: float = Field(gt=0)
     min_dimension: float = Field(gt=0)
 
-Command = Annotated[MoveRoom|SwapRooms|SetParameter|RemoveColumn|SetEquipment|SetLock|Reroute|SetBrief|SetSite|SetRate|SetGrid|MoveFurniture|MoveFixture|MoveEquipment|AddElement|SetRoomRequirements,Field(discriminator='type')]
+Command = Annotated[MoveRoom|SwapRooms|SetParameter|RemoveColumn|SetEquipment|SetLock|Reroute|SetBrief|SetSite|SetRate|SetGrid|MoveFurniture|MoveFixture|MoveEquipment|AddElement|SetRoomRequirements|SetSolar,Field(discriminator='type')]
 class CommandRequest(Model):
     base_revision: str
     command_id: str = Field(min_length=1,max_length=128)
@@ -272,7 +301,8 @@ DEPENDENCIES={
  'reroute':['routing','quantities'], 'set_brief':['layout','budget'],
  'set_site':['terrain','layout','routing','quantities'],
  'set_rate':['quantities','budget'], 'set_grid':['geometry','structure','foundations','routing','quantities'],
- 'move_furniture':['fitout','routing','quantities'], 'move_fixture':['routing','quantities'], 'move_equipment':['routing','electrical','quantities'], 'add_element':['routing','electrical','fitout','quantities'], 'set_room_requirements':['layout']}
+ 'move_furniture':['fitout','routing','quantities'], 'move_fixture':['routing','quantities'], 'move_equipment':['routing','electrical','quantities'], 'add_element':['routing','electrical','fitout','quantities'], 'set_room_requirements':['layout'],
+ 'set_solar':['solar','structure','foundations','electrical','quantities']}
 
 def digest(value):
     if isinstance(value,BaseModel): value=value.model_dump(mode='json')
@@ -335,6 +365,7 @@ def apply_commands(model: Building, commands:list[Command]):
                 if not cmd.circuit_id:raise ValueError('Equipment must be assigned to a circuit')
                 b.equipment.append(Equipment(id=cmd.id,name=cmd.name,room_id=cmd.room_id,dx=cmd.dx,dy=cmd.dy,watts=cmd.watts,circuit_id=cmd.circuit_id,source='User-entered nameplate rating'))
             else:b.furniture.append(Furniture(id=cmd.id,name=cmd.name,room_id=cmd.room_id,dx=cmd.dx,dy=cmd.dy,w=cmd.w,h=cmd.h))
+        elif isinstance(cmd,SetSolar):b.solar=cmd.solar
         elif isinstance(cmd,SetRoomRequirements):
             if cmd.max_area<cmd.min_area:raise ValueError('Maximum area must be at least minimum area')
             r=obj(b.rooms,cmd.room_id);r.min_area=cmd.min_area;r.max_area=cmd.max_area;r.min_dimension=cmd.min_dimension
