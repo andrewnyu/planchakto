@@ -107,7 +107,10 @@ def _gemini(payload,vertex=False,attachment=None):
         thinking_config=types.ThinkingConfig(thinking_level=os.getenv('GEMINI_THINKING','LOW')),response_mime_type='application/json',response_json_schema=gemini_schema(),system_instruction=SYSTEM+(' '+SKETCH if attachment else ''))
     with client:
         for n,model in enumerate(attempts):
-            try:return client.models.generate_content(model=model,contents=contents,config=config).text
+            try:
+                t=time.monotonic();res=client.models.generate_content(model=model,contents=contents,config=config);u=res.usage_metadata
+                log.info('Gemini %s %.1fs attachment=%s prompt=%s thoughts=%s output=%s',model,time.monotonic()-t,bool(attachment),u and u.prompt_token_count,u and u.thoughts_token_count,u and u.candidates_token_count)
+                return res.text
             except (errors.APIError,httpx.TransportError) as e:
                 if n==len(attempts)-1 or not (isinstance(e,httpx.TransportError) or getattr(e,'code',None) in (429,503,504)):raise
                 log.warning('Gemini %s failed (%s); retrying with %s',model,getattr(e,'code',type(e).__name__),attempts[n+1])
@@ -133,6 +136,7 @@ def interpret(req:AIRequest,snapshot):
     start=time.monotonic();plan=validate_plan(AIPlan.model_validate_json(call(payload)),req)
     problems=self_check(plan,snapshot)
     # Only correct when there is time left inside Cloud Run's request timeout; otherwise the checks show the problems.
+    if problems:log.info('Self-check found %d problem(s) after %.1fs: %s',len(problems),time.monotonic()-start,problems[:3])
     if problems and time.monotonic()-start<50:
         # One bounded self-correction pass: show the model what its edit broke and let it repair the commands.
         retry=json.loads(payload)|{'previous_attempt':{'commands':[c.model_dump() for c in plan.commands],'problems':problems,

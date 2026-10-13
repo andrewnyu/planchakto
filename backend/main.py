@@ -17,6 +17,7 @@ from .layout import generate_layouts
 from .ai import AIRequest,interpret,status
 
 app=FastAPI(title='BuildGraph',version='0.1.0')
+logging.basicConfig(level=logging.INFO,format='%(levelname)s %(name)s: %(message)s')
 log=logging.getLogger('buildgraph')
 _store=None
 def store():
