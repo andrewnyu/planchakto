@@ -140,6 +140,7 @@ def test_gemini_schema_is_decodable_subset_and_validation_still_enforces_limits(
     from backend.ai import gemini_schema,RESTRICTED
     text=json.dumps(gemini_schema())
     assert '$ref' not in text and '"const"' not in text and 'maxItems' not in text and 'oneOf' not in text
+    assert 'exclusiveMinimum' not in text and 'minimum' not in text   # bounds corrupted decoded numbers (3.0 -> 3e-10)
     types={x['properties']['type']['enum'][0] for x in gemini_schema()['properties']['commands']['items']['anyOf']}
     assert types and not types&RESTRICTED and 'move_room' in types
     too_many={'revision_id':'a','action':'edit','explanation':'x','commands':[{'type':'reroute'}]*21}

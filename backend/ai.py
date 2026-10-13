@@ -44,7 +44,8 @@ RESTRICTED={'set_lock','set_site','set_grid','set_brief','set_rate','set_solar',
 @functools.cache
 def gemini_schema():
     """AIPlan schema in the subset Gemini constrained decoding accepts: $refs inlined, const -> enum, oneOf -> anyOf,
-    only assistant-permitted commands, and no maxItems (with a large union it overflows the decoding grammar; the 20-command
+    only assistant-permitted commands, no maxItems (with a large union it overflows the decoding grammar) and no numeric bounds
+    (they corrupted decoded numbers); the 20-command
     limit is still enforced when the reply is validated against AIPlan)."""
     allowed=[c for c in get_args(get_args(Command)[0]) if get_args(c.model_fields['type'].annotation)[0] not in RESTRICTED]
     def conv(n):
@@ -52,7 +53,8 @@ def gemini_schema():
             if '$ref' in n:return conv(defs[n['$ref'].split('/')[-1]])
             out={}
             for k,v in n.items():
-                if k in ('discriminator','title','default','$defs'):continue
+                # Numeric/length bounds are dropped: with exclusiveMinimum Vertex decoded widths of 3.0 as 3e-10. AIPlan re-validates them.
+                if k in ('discriminator','title','default','$defs','exclusiveMinimum','exclusiveMaximum','minimum','maximum','minLength','maxLength'):continue
                 if k=='const':out['enum']=[v];continue
                 out['anyOf' if k=='oneOf' else k]=conv(v)
             return out
@@ -98,9 +100,12 @@ def _gemini(payload,vertex=False,attachment=None):
         model=os.getenv('GEMINI_VISION_MODEL') or os.environ['GEMINI_MODEL'] if attachment else os.environ['GEMINI_MODEL']
         client.models.get(model=model)
         contents=[types.Part.from_bytes(data=attachment.raw(),mime_type=attachment.mime_type),payload] if attachment else payload
-        return client.models.generate_content(model=model,contents=contents,config=types.GenerateContentConfig(temperature=0,
+        generate=lambda:client.models.generate_content(model=model,contents=contents,config=types.GenerateContentConfig(temperature=0,
             # Low thinking keeps edits at ~5 s; medium/high took 10–35 s for the same typed result on gemini-3.8-flash.
             thinking_config=types.ThinkingConfig(thinking_level=os.getenv('GEMINI_THINKING','LOW')),response_mime_type='application/json',response_json_schema=gemini_schema(),system_instruction=SYSTEM+(' '+SKETCH if attachment else ''))).text
+        import httpx
+        try:return generate()
+        except httpx.TransportError:return generate()  # dropped connections are not covered by the SDK's status-code retry
 def _openrouter(payload,attachment=None):
     import httpx
     # The schema goes in the prompt, not response_format: upstream constrained decoding rejects the command
