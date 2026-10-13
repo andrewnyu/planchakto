@@ -20,6 +20,15 @@ Built for small PH architecture and engineering teams iterating on a modest sing
 - **Fire protection (optional).** Screens a business, concentrated-use business (e.g. BPO) or mercantile occupancy against the 2019 RIRR of RA 9514 (Fire Code). It covers occupant load, number of exits with single-exit allowances, travel distance, dead-end corridors, common path, exit capacity, corridor width, and the sprinkler, alarm, emergency lighting, exit sign and portable extinguisher (Table 7) requirements. Each result cites its clause (e.g. `10.2.16.2 ¶6.2`). Travel is measured on a 0.25 m grid that only passes between rooms through modeled doors, and the plan draws the critical egress route, the exits and the extinguishers. The one value not located in the RIRR text (mercantile unsprinklered travel distance) stays `missing_input` until entered.
 - **Site.** Import a survey CSV and a boundary, triangulate the terrain, and validate the site.
 - **AI assistant (optional).** Plain-language requests ("move the bathroom next to the kitchen", "raise the roof live load to 1.5 kPa") become **typed commands**. They go through exactly the same validation pipeline as manual edits and always land as a candidate for review. The assistant cannot change locks, site, grid, brief or rates.
+- **Permit drawing set.** Export → *Permit drawing set* produces discipline sheets from the revision:
+  - A-1 site development plan, general notes and sheet index
+  - A-2 floor plan and room schedule
+  - S-1 foundation and roof framing plans with beam and footing schedules
+  - E-1 electrical layout, schedule of loads and PV single-line diagram
+  - P-1 plumbing and sanitary layout with fixture schedule
+  - FP-1 fire protection and egress plan
+
+  Output is a vector **PDF** (20″ × 30″ or A3), each sheet with a PH permit title block: project, location, owner, sheet contents and number, a blank seal box, and the professional's PRC No. and validity, IAPOA/APO No., PTR No. (date and place) and TIN, per NBC IRR Figure III.2. The other format is a layered **DXF** in metres (AIA-style layers: `A-WALL`, `S-BEAM`, `E-PV`, `P-SANR`, `FP-EGRS`, …) for finishing in CAD. Every sheet is stamped *Preliminary — not for construction* until it is signed and sealed. Elevations, sections, details and the vicinity map are not generated.
 - **Revisions.** Undo and redo, branchable revision history, and import/export of a project as JSON. Quantities export as CSV, and there is a printable HTML report.
 
 The demo project, *San Isidro Studio*, is a synthetic 12 × 9 m building with a central accessible corridor, six rooms and a regular steel roof grid. All its dimensions, loads and rates are synthetic.
@@ -111,6 +120,7 @@ backend/
   quantities.py   takeoff, pricing, revision comparison
   solar.py        PV array fit, roof load, service & grid screens
   fire.py         RA 9514 egress grid and fire-protection screen
+  drawings.py     permit sheet set → PDF (reportlab) and DXF (ezdxf)
   rules.py        rule catalogue with sources
   ai.py           Gemini / OpenRouter interpreter + plan validation
   store.py        SQLite revision store (cloud_store.py for GCP)
@@ -120,6 +130,7 @@ frontend/src/
   Model3D.tsx     Three.js model (lazy-loaded)
   Solar.tsx       solar PV results and inputs (Engineering tab)
   Fire.tsx        fire protection results and inputs (Engineering tab)
+  PermitExport.tsx permit drawing export (Export dialog)
 examples/         demo project, survey, boundary, coordinated variant
 scripts/          dev server, benchmark, fixtures, Gemini check
 docs/             implementation plan, benchmark results

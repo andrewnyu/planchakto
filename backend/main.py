@@ -7,7 +7,8 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError,Field
 from .domain import Building,CommandRequest,Model,digest
 from .store import LocalStore,Conflict
-from .engine import ENGINE_VERSION,validate_result
+from .engine import ENGINE_VERSION,validate_result,compute
+from .drawings import PermitRequest,render_pdf,render_dxf
 from .quantities import compare
 from .rules import RULES
 from .structure import CATALOG
@@ -109,6 +110,17 @@ def export_csv(id:str):
     for x in s['results']['quantities']['items']:writer.writerow([safe(v) for v in [id,x['name'],x['unit'],x['net'],x['waste'],x['stock'],x['purchased'],x['rate'],x['cost'],x['rate_source'],x['rate_date'],';'.join(x['source_ids']),x['formula'],'provisional' if x['provisional'] else 'modeled']])
     for exclusion in s['results']['quantities']['exclusions']:writer.writerow([id,'EXCLUDED: '+exclusion,'','','','','','','','','','','','unsupported'])
     return Response(out.getvalue(),media_type='text/csv',headers={'Content-Disposition':'attachment; filename=buildgraph-quantities.csv'})
+def permit_inputs(id):
+    # Drawings are rebuilt from the stored model with the current engine, so a stale stored result cannot leak in.
+    s=store().get(id);b=Building.model_validate(s['model']);return b,compute(b,id)
+@app.post('/api/export/{id}/permit.pdf')
+def permit_pdf(id:str,req:PermitRequest):
+    b,r=permit_inputs(id)
+    return Response(render_pdf(b,r,req,id),media_type='application/pdf',headers={'Content-Disposition':f'attachment; filename=permit-set-{id}-{req.sheet}.pdf'})
+@app.post('/api/export/{id}/permit.dxf')
+def permit_dxf(id:str,req:PermitRequest):
+    b,r=permit_inputs(id)
+    return Response(render_dxf(b,r,req,id),media_type='image/vnd.dxf',headers={'Content-Disposition':f'attachment; filename=permit-set-{id}.dxf'})
 @app.get('/api/export/{id}/report',response_class=HTMLResponse)
 def report(id:str):
     s=store().get(id);r=s['results'];esc=lambda x:html.escape(str(x));rows=''.join(f'<tr><td>{esc(q["name"])}</td><td>{q["net"]:.2f} {esc(q["unit"])}</td><td>{q["purchased"]:.2f}</td><td>₱{q["cost"]:,.2f}</td></tr>' for q in r['quantities']['items']);checks=''.join(f'<tr><td>{esc(c["rule_id"])}</td><td>{esc(c["status"])}</td><td>{esc(c["evidence"])}</td></tr>' for c in r['checks'])

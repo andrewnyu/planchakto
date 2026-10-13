@@ -8,7 +8,9 @@ charset-normalizer==3.5.2
 click==8.5.0
 cryptography==50.0.2
 distro==1.9.0
+ezdxf==1.4.4
 fastapi==0.143.0
+fonttools==4.66.1
 google-api-core==2.42.0
 google-auth==2.62.0
 google-cloud-core==2.8.0
@@ -32,6 +34,7 @@ opentelemetry-api==1.45.1
 ortools==9.15.6755
 packaging==26.3
 pandas==3.0.6
+pillow==12.3.0
 pluggy==1.6.0
 proto-plus==1.29.0
 protobuf==6.33.6
@@ -41,10 +44,12 @@ pycparser==3.11
 pydantic==2.14.1
 pydantic_core==2.50.1
 Pygments==2.21.0
+pyparsing==3.3.3
 pytest==9.1.1
 python-dateutil==2.9.0.post0
 python-dotenv==1.2.4
 PyYAML==6.0.3
+reportlab==5.0.1
 requests==2.34.2
 scipy==1.18.1
 shapely==2.2.0

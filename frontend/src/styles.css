@@ -35,3 +35,21 @@
 .row-fields{display:grid;grid-template-columns:minmax(90px,1fr) minmax(90px,1fr) minmax(90px,1fr) auto auto;gap:6px;align-items:center;margin:0 0 6px}
 .row-fields select{font-size:11px;padding:7px}
 @media (max-width:760px){.row-fields{grid-template-columns:1fr 1fr}}
+
+/* Permit drawing export */
+.permit-export{margin-top:22px;border-top:1px solid var(--line);padding-top:18px}
+.permit-export header h3{font-size:13px;margin:0 0 4px}
+.permit-export header p{font-size:11px;color:var(--muted);margin:0 0 14px;line-height:1.5}
+.permit-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0 16px}
+.permit-grid input,.permit-grid select,.permit-pro input{width:100%;box-sizing:border-box}
+.permit-disciplines{display:flex;flex-direction:column;gap:6px;margin:4px 0 14px}
+.permit-discipline{border:1px solid var(--line);border-radius:6px;padding:9px 12px;background:white}
+.permit-discipline.on{border-color:#b9c9ad}
+.permit-discipline>label{display:flex;gap:10px;align-items:flex-start;cursor:pointer}
+.permit-discipline>label span{display:flex;flex-direction:column;gap:2px}
+.permit-discipline strong{font-size:12px;font-weight:500}
+.permit-discipline small{font-size:10px;color:var(--muted)}
+.permit-discipline .text-button{margin:6px 0 0 24px;display:inline-flex;gap:4px;align-items:center}
+.permit-pro{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:0 12px;margin:10px 0 0 24px}
+.permit-actions{display:flex;gap:8px;flex-wrap:wrap}
+@media (max-width:600px){.permit-pro,.permit-discipline .text-button{margin-left:0}}
