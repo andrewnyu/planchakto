@@ -1,0 +1,160 @@
+{
+  "machine": "macOS-26.0.1-arm64-arm-64bit-Mach-O",
+  "python": "3.13.9",
+  "seed": 42,
+  "timing": "Warm imports, sequential in-process wall clock. Machine-specific, not a general performance claim.",
+  "fixtures": {
+    "original": {
+      "greedy": {
+        "timing": {
+          "runs": 7,
+          "median_ms": 4.234,
+          "min_ms": 3.92,
+          "max_ms": 5.066
+        },
+        "feasible": true,
+        "issues": [],
+        "area_deviation_m2": 0.0
+      },
+      "cp_sat": {
+        "timing": {
+          "runs": 3,
+          "median_ms": 22.018,
+          "min_ms": 21.766,
+          "max_ms": 23.894
+        },
+        "candidate_count": 2,
+        "statuses": [
+          "OPTIMAL",
+          "OPTIMAL"
+        ],
+        "objectives": [
+          "Area-fit weight 15, change weight 0, wet-service distance weight 8",
+          "Area-fit weight 10, change weight 0, wet-service distance weight 24"
+        ]
+      },
+      "routing": {
+        "direct": {
+          "timing": {
+            "runs": 7,
+            "median_ms": 0.447,
+            "min_ms": 0.438,
+            "max_ms": 0.593
+          },
+          "route_count": 10,
+          "failed_routes": 3,
+          "total_modeled_length_m": 55.0,
+          "scope": "Failed/disconnected routes may have zero length; totals are not comparable as installed complete networks."
+        },
+        "avoid": {
+          "timing": {
+            "runs": 7,
+            "median_ms": 10.009,
+            "min_ms": 9.589,
+            "max_ms": 10.177
+          },
+          "route_count": 10,
+          "failed_routes": 1,
+          "total_modeled_length_m": 48.25,
+          "scope": "Failed/disconnected routes may have zero length; totals are not comparable as installed complete networks."
+        }
+      },
+      "complete_compute": {
+        "runs": 7,
+        "median_ms": 17.856,
+        "min_ms": 17.589,
+        "max_ms": 18.67
+      },
+      "checks": {
+        "pass": 44,
+        "fail": 1,
+        "missing_input": 0,
+        "unsupported": 6,
+        "not_applicable": 0
+      },
+      "estimate_PHP": 613776.83
+    },
+    "swapped_wet_rooms": {
+      "greedy": {
+        "timing": {
+          "runs": 7,
+          "median_ms": 3.883,
+          "min_ms": 3.854,
+          "max_ms": 4.245
+        },
+        "feasible": true,
+        "issues": [],
+        "area_deviation_m2": 0.0
+      },
+      "cp_sat": {
+        "timing": {
+          "runs": 3,
+          "median_ms": 28.627,
+          "min_ms": 25.538,
+          "max_ms": 31.122
+        },
+        "candidate_count": 3,
+        "statuses": [
+          "OPTIMAL",
+          "OPTIMAL",
+          "OPTIMAL"
+        ],
+        "objectives": [
+          "Area-fit weight 40, change weight 2, wet-service distance weight 8",
+          "Area-fit weight 15, change weight 0, wet-service distance weight 8",
+          "Area-fit weight 10, change weight 0, wet-service distance weight 24"
+        ]
+      },
+      "routing": {
+        "direct": {
+          "timing": {
+            "runs": 7,
+            "median_ms": 0.502,
+            "min_ms": 0.436,
+            "max_ms": 0.669
+          },
+          "route_count": 10,
+          "failed_routes": 4,
+          "total_modeled_length_m": 64.0,
+          "scope": "Failed/disconnected routes may have zero length; totals are not comparable as installed complete networks."
+        },
+        "avoid": {
+          "timing": {
+            "runs": 7,
+            "median_ms": 15.502,
+            "min_ms": 14.918,
+            "max_ms": 16.506
+          },
+          "route_count": 10,
+          "failed_routes": 2,
+          "total_modeled_length_m": 58.5,
+          "scope": "Failed/disconnected routes may have zero length; totals are not comparable as installed complete networks."
+        }
+      },
+      "complete_compute": {
+        "runs": 7,
+        "median_ms": 24.995,
+        "min_ms": 24.466,
+        "max_ms": 26.445
+      },
+      "checks": {
+        "pass": 43,
+        "fail": 2,
+        "missing_input": 0,
+        "unsupported": 6,
+        "not_applicable": 0
+      },
+      "estimate_PHP": 614046.83
+    }
+  },
+  "beam_benchmark": {
+    "L_m": 4,
+    "q_N_m": 3000,
+    "E_Pa": 200000000000.0,
+    "I_m4": 8e-06,
+    "analytical_deflection_mm": 6.25,
+    "computed_deflection_mm": 6.250000000001764,
+    "absolute_error_mm": 1.7639223415244487e-12,
+    "equilibrium_residual_N": 9.313225746154785e-10
+  }
+}

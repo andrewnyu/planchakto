@@ -1,0 +1,29 @@
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args: [build, -t, '${_REGION}-docker.pkg.dev/$PROJECT_ID/buildgraph/app:$BUILD_ID', .]
+  - name: gcr.io/cloud-builders/docker
+    args: [push, '${_REGION}-docker.pkg.dev/$PROJECT_ID/buildgraph/app:$BUILD_ID']
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - buildgraph
+      - '--image=${_REGION}-docker.pkg.dev/$PROJECT_ID/buildgraph/app:$BUILD_ID'
+      - '--region=${_REGION}'
+      - '--service-account=buildgraph-runtime@$PROJECT_ID.iam.gserviceaccount.com'
+      - '--no-allow-unauthenticated'
+      - '--memory=1Gi'
+      - '--cpu=1'
+      - '--concurrency=8'
+      - '--timeout=120'
+      - '--min-instances=0'
+      - '--max-instances=2'
+      - '--set-env-vars=BUILDGRAPH_STORAGE=google,GOOGLE_CLOUD_PROJECT=$PROJECT_ID,BUILDGRAPH_BUCKET=${_BUCKET},BUILDGRAPH_WORKSPACE=demo,OPENBLAS_NUM_THREADS=1'
+substitutions:
+  _REGION: asia-southeast1
+  _BUCKET: REPLACE_WITH_PRIVATE_BUCKET
+images:
+  - '${_REGION}-docker.pkg.dev/$PROJECT_ID/buildgraph/app:$BUILD_ID'
+options:
+  logging: CLOUD_LOGGING_ONLY

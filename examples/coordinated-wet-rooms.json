@@ -1,0 +1,650 @@
+{
+  "schema_version": "1.0",
+  "model": {
+    "id": "bg-studio",
+    "name": "San Isidro Studio",
+    "description": "Synthetic Philippine project \u00b7 preliminary planning",
+    "width": 12.0,
+    "depth": 9.0,
+    "height": 3.0,
+    "roof_id": "roof-01",
+    "slab_id": "slab-01",
+    "grid_x": [
+      0.0,
+      4.0,
+      8.0,
+      12.0
+    ],
+    "grid_y": [
+      0.0,
+      3.5,
+      9.0
+    ],
+    "rooms": [
+      {
+        "id": "living",
+        "name": "Living & dining",
+        "kind": "living",
+        "x": 0.0,
+        "y": 0.0,
+        "w": 6.0,
+        "h": 4.0,
+        "min_area": 18.0,
+        "max_area": 28.0,
+        "min_dimension": 2.0,
+        "locked": false
+      },
+      {
+        "id": "kitchen",
+        "name": "Kitchen",
+        "kind": "kitchen",
+        "x": 9.0,
+        "y": 0.0,
+        "w": 3.0,
+        "h": 4.0,
+        "min_area": 9.0,
+        "max_area": 16.0,
+        "min_dimension": 2.0,
+        "locked": false
+      },
+      {
+        "id": "bath",
+        "name": "Bathroom",
+        "kind": "bathroom",
+        "x": 6.0,
+        "y": 0.0,
+        "w": 3.0,
+        "h": 4.0,
+        "min_area": 6.0,
+        "max_area": 14.0,
+        "min_dimension": 2.0,
+        "locked": false
+      },
+      {
+        "id": "bed-1",
+        "name": "Bedroom 01",
+        "kind": "bedroom",
+        "x": 0.0,
+        "y": 5.5,
+        "w": 4.0,
+        "h": 3.5,
+        "min_area": 10.0,
+        "max_area": 18.0,
+        "min_dimension": 2.0,
+        "locked": false
+      },
+      {
+        "id": "office",
+        "name": "Studio",
+        "kind": "office",
+        "x": 4.0,
+        "y": 5.5,
+        "w": 4.0,
+        "h": 3.5,
+        "min_area": 10.0,
+        "max_area": 18.0,
+        "min_dimension": 2.0,
+        "locked": false
+      },
+      {
+        "id": "bed-2",
+        "name": "Bedroom 02",
+        "kind": "bedroom",
+        "x": 8.0,
+        "y": 5.5,
+        "w": 4.0,
+        "h": 3.5,
+        "min_area": 10.0,
+        "max_area": 18.0,
+        "min_dimension": 2.0,
+        "locked": false
+      },
+      {
+        "id": "hall",
+        "name": "Circulation",
+        "kind": "corridor",
+        "x": 0.0,
+        "y": 4.0,
+        "w": 12.0,
+        "h": 1.5,
+        "min_area": 18.0,
+        "max_area": 18.0,
+        "min_dimension": 1.5,
+        "locked": true
+      }
+    ],
+    "columns": [
+      {
+        "id": "col-0-0",
+        "x": 0.0,
+        "y": 0.0,
+        "active": true,
+        "locked": false
+      },
+      {
+        "id": "col-1-0",
+        "x": 4.0,
+        "y": 0.0,
+        "active": true,
+        "locked": false
+      },
+      {
+        "id": "col-2-0",
+        "x": 8.0,
+        "y": 0.0,
+        "active": true,
+        "locked": false
+      },
+      {
+        "id": "col-3-0",
+        "x": 12.0,
+        "y": 0.0,
+        "active": true,
+        "locked": false
+      },
+      {
+        "id": "col-0-1",
+        "x": 0.0,
+        "y": 3.5,
+        "active": true,
+        "locked": false
+      },
+      {
+        "id": "col-1-1",
+        "x": 4.0,
+        "y": 3.5,
+        "active": true,
+        "locked": false
+      },
+      {
+        "id": "col-2-1",
+        "x": 8.0,
+        "y": 3.5,
+        "active": true,
+        "locked": false
+      },
+      {
+        "id": "col-3-1",
+        "x": 12.0,
+        "y": 3.5,
+        "active": true,
+        "locked": false
+      },
+      {
+        "id": "col-0-2",
+        "x": 0.0,
+        "y": 9.0,
+        "active": true,
+        "locked": false
+      },
+      {
+        "id": "col-1-2",
+        "x": 4.0,
+        "y": 9.0,
+        "active": true,
+        "locked": false
+      },
+      {
+        "id": "col-2-2",
+        "x": 8.0,
+        "y": 9.0,
+        "active": true,
+        "locked": false
+      },
+      {
+        "id": "col-3-2",
+        "x": 12.0,
+        "y": 9.0,
+        "active": true,
+        "locked": false
+      }
+    ],
+    "fixtures": [
+      {
+        "id": "sink",
+        "name": "Kitchen sink",
+        "room_id": "kitchen",
+        "dx": 0.75,
+        "dy": 0.75,
+        "elevation": 0.0,
+        "kind": "sink"
+      },
+      {
+        "id": "wc",
+        "name": "Water closet",
+        "room_id": "bath",
+        "dx": 0.75,
+        "dy": 0.75,
+        "elevation": 0.0,
+        "kind": "wc"
+      },
+      {
+        "id": "basin",
+        "name": "Wash basin",
+        "room_id": "bath",
+        "dx": 1.5,
+        "dy": 0.75,
+        "elevation": 0.0,
+        "kind": "basin"
+      }
+    ],
+    "equipment": [
+      {
+        "id": "eq-ac",
+        "name": "Studio air conditioner",
+        "room_id": "office",
+        "dx": 2.0,
+        "dy": 2.5,
+        "watts": 1200.0,
+        "circuit_id": "C03",
+        "source": "Synthetic nameplate rating"
+      },
+      {
+        "id": "eq-fridge",
+        "name": "Refrigerator",
+        "room_id": "kitchen",
+        "dx": 2.5,
+        "dy": 0.5,
+        "watts": 200.0,
+        "circuit_id": "C02",
+        "source": "Synthetic nameplate rating"
+      },
+      {
+        "id": "eq-light",
+        "name": "Living room lighting",
+        "room_id": "living",
+        "dx": 3.0,
+        "dy": 2.0,
+        "watts": 60.0,
+        "circuit_id": "C01",
+        "source": "Synthetic nameplate rating"
+      },
+      {
+        "id": "eq-socket",
+        "name": "Studio workstation",
+        "room_id": "office",
+        "dx": 1.0,
+        "dy": 1.0,
+        "watts": 350.0,
+        "circuit_id": "C02",
+        "source": "Synthetic nameplate rating"
+      }
+    ],
+    "circuits": [
+      {
+        "id": "C01",
+        "name": "Lighting",
+        "voltage": 230.0,
+        "power_factor": 1.0,
+        "demand_factor": 1.0
+      },
+      {
+        "id": "C02",
+        "name": "General equipment",
+        "voltage": 230.0,
+        "power_factor": 1.0,
+        "demand_factor": 1.0
+      },
+      {
+        "id": "C03",
+        "name": "Air conditioning",
+        "voltage": 230.0,
+        "power_factor": 1.0,
+        "demand_factor": 1.0
+      }
+    ],
+    "furniture": [
+      {
+        "id": "sofa",
+        "name": "Sofa",
+        "room_id": "living",
+        "dx": 0.6,
+        "dy": 0.6,
+        "w": 2.2,
+        "h": 0.9,
+        "clearance": 0.6,
+        "locked": false
+      },
+      {
+        "id": "table",
+        "name": "Dining table",
+        "room_id": "living",
+        "dx": 3.7,
+        "dy": 1.0,
+        "w": 1.5,
+        "h": 0.9,
+        "clearance": 0.6,
+        "locked": false
+      },
+      {
+        "id": "bed-a",
+        "name": "Bed",
+        "room_id": "bed-1",
+        "dx": 1.0,
+        "dy": 1.0,
+        "w": 1.5,
+        "h": 2.0,
+        "clearance": 0.6,
+        "locked": false
+      },
+      {
+        "id": "bed-b",
+        "name": "Bed",
+        "room_id": "bed-2",
+        "dx": 1.0,
+        "dy": 1.0,
+        "w": 1.5,
+        "h": 2.0,
+        "clearance": 0.6,
+        "locked": false
+      },
+      {
+        "id": "desk",
+        "name": "Studio desk",
+        "room_id": "office",
+        "dx": 0.7,
+        "dy": 1.8,
+        "w": 1.6,
+        "h": 0.7,
+        "clearance": 0.6,
+        "locked": false
+      }
+    ],
+    "obstacles": [
+      {
+        "id": "service-block",
+        "name": "No-penetration foundation zone",
+        "x": 8.0,
+        "y": 0.5,
+        "w": 0.5,
+        "h": 1.5
+      }
+    ],
+    "site": {
+      "boundary": [
+        {
+          "x": -2.0,
+          "y": -2.0,
+          "z": 0.0
+        },
+        {
+          "x": 14.0,
+          "y": -2.0,
+          "z": 0.0
+        },
+        {
+          "x": 14.0,
+          "y": 11.0,
+          "z": 0.0
+        },
+        {
+          "x": -2.0,
+          "y": 11.0,
+          "z": 0.0
+        }
+      ],
+      "survey": [
+        {
+          "x": -2.0,
+          "y": -2.0,
+          "z": -0.164
+        },
+        {
+          "x": 6.0,
+          "y": -2.0,
+          "z": -0.02
+        },
+        {
+          "x": 14.0,
+          "y": -2.0,
+          "z": 0.124
+        },
+        {
+          "x": -2.0,
+          "y": 4.5,
+          "z": -0.1055
+        },
+        {
+          "x": 6.0,
+          "y": 4.5,
+          "z": 0.0385
+        },
+        {
+          "x": 14.0,
+          "y": 4.5,
+          "z": 0.1825
+        },
+        {
+          "x": -2.0,
+          "y": 11.0,
+          "z": -0.047
+        },
+        {
+          "x": 6.0,
+          "y": 11.0,
+          "z": 0.097
+        },
+        {
+          "x": 14.0,
+          "y": 11.0,
+          "z": 0.241
+        }
+      ],
+      "units": "m",
+      "crs": "LOCAL_ENGINEERING",
+      "origin": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 100.0
+      },
+      "datum": "Synthetic local benchmark, 100 m",
+      "north": 0.0,
+      "setback": 1.0,
+      "setback_source": "User demonstration criterion; not a verified jurisdictional requirement",
+      "platform_elevation": 0.0,
+      "access": {
+        "x": 0.0,
+        "y": 4.75,
+        "z": 0.0
+      },
+      "water": {
+        "x": 13.0,
+        "y": 1.0,
+        "z": 0.0
+      },
+      "drain": {
+        "x": 13.0,
+        "y": 1.0,
+        "z": -0.4
+      },
+      "panel": {
+        "x": 1.0,
+        "y": 4.75,
+        "z": 0.0
+      }
+    },
+    "engineering": {
+      "dead": {
+        "value": 0.65,
+        "unit": "kPa",
+        "source": "Synthetic example \u2014 not verified project data",
+        "basis": "demonstration"
+      },
+      "live": {
+        "value": 0.75,
+        "unit": "kPa",
+        "source": "Synthetic example \u2014 not verified project data",
+        "basis": "demonstration"
+      },
+      "soil": {
+        "value": 100.0,
+        "unit": "kPa",
+        "source": "Synthetic example \u2014 not verified project data",
+        "basis": "gross allowable service"
+      },
+      "dead_factor": 1.2,
+      "live_factor": 1.6,
+      "combination_source": "Illustrative user-supplied 1.2D + 1.6L; not a code compliance claim",
+      "elastic_modulus": 200000.0,
+      "yield_strength": 250.0,
+      "section": "RHS200",
+      "deflection_ratio": 240.0,
+      "footing_width": 1.2,
+      "footing_thickness": 0.3,
+      "drain_slope": 0.01,
+      "wind": {
+        "value": null,
+        "unit": "kPa",
+        "source": "Synthetic example \u2014 not verified project data",
+        "basis": "unsupported \u2014 unused by solver"
+      },
+      "seismic": {
+        "value": null,
+        "unit": "g",
+        "source": "Synthetic example \u2014 not verified project data",
+        "basis": "unsupported \u2014 unused by solver"
+      }
+    },
+    "brief": {
+      "use": "Small studio residence",
+      "budget": 900000.0,
+      "wet_adjacency": true,
+      "area_weight": 5,
+      "change_weight": 2,
+      "wet_weight": 8
+    },
+    "rates": [
+      {
+        "id": "slab",
+        "name": "Ground slab concrete",
+        "unit": "m\u00b3",
+        "rate": 5800.0,
+        "waste": 0.05,
+        "stock": null,
+        "source": "Demonstration catalog, not market pricing",
+        "date": "2026-10-13"
+      },
+      {
+        "id": "roof",
+        "name": "Roof covering",
+        "unit": "m\u00b2",
+        "rate": 680.0,
+        "waste": 0.1,
+        "stock": null,
+        "source": "Demonstration catalog, not market pricing",
+        "date": "2026-10-13"
+      },
+      {
+        "id": "steel",
+        "name": "Roof beams \u00b7 steel",
+        "unit": "kg",
+        "rate": 95.0,
+        "waste": 0.05,
+        "stock": null,
+        "source": "Demonstration catalog, not market pricing",
+        "date": "2026-10-13"
+      },
+      {
+        "id": "columns",
+        "name": "Steel columns \u00b7 geometric allowance",
+        "unit": "m",
+        "rate": 1550.0,
+        "waste": 0.05,
+        "stock": 6.0,
+        "source": "Demonstration catalog, not market pricing",
+        "date": "2026-10-13"
+      },
+      {
+        "id": "foundations",
+        "name": "Pad foundation concrete",
+        "unit": "m\u00b3",
+        "rate": 5800.0,
+        "waste": 0.05,
+        "stock": null,
+        "source": "Demonstration catalog, not market pricing",
+        "date": "2026-10-13"
+      },
+      {
+        "id": "walls",
+        "name": "Wall finish \u00b7 both faces",
+        "unit": "m\u00b2",
+        "rate": 320.0,
+        "waste": 0.05,
+        "stock": null,
+        "source": "Demonstration catalog, not market pricing",
+        "date": "2026-10-13"
+      },
+      {
+        "id": "floor",
+        "name": "Floor finish",
+        "unit": "m\u00b2",
+        "rate": 720.0,
+        "waste": 0.08,
+        "stock": null,
+        "source": "Demonstration catalog, not market pricing",
+        "date": "2026-10-13"
+      },
+      {
+        "id": "water",
+        "name": "Cold-water pipe",
+        "unit": "m",
+        "rate": 85.0,
+        "waste": 0.1,
+        "stock": 3.0,
+        "source": "Demonstration catalog, not market pricing",
+        "date": "2026-10-13"
+      },
+      {
+        "id": "drain",
+        "name": "Gravity drain pipe",
+        "unit": "m",
+        "rate": 240.0,
+        "waste": 0.1,
+        "stock": 3.0,
+        "source": "Demonstration catalog, not market pricing",
+        "date": "2026-10-13"
+      },
+      {
+        "id": "conduit",
+        "name": "Electrical conduit",
+        "unit": "m",
+        "rate": 65.0,
+        "waste": 0.1,
+        "stock": 3.0,
+        "source": "Demonstration catalog, not market pricing",
+        "date": "2026-10-13"
+      },
+      {
+        "id": "fittings",
+        "name": "Modeled elbows",
+        "unit": "each",
+        "rate": 75.0,
+        "waste": 0.0,
+        "stock": null,
+        "source": "Demonstration catalog, not market pricing",
+        "date": "2026-10-13"
+      },
+      {
+        "id": "fixtures",
+        "name": "Plumbing fixtures \u00b7 blended allowance",
+        "unit": "each",
+        "rate": 4200.0,
+        "waste": 0.0,
+        "stock": null,
+        "source": "Demonstration catalog, not market pricing",
+        "date": "2026-10-13"
+      },
+      {
+        "id": "equipment",
+        "name": "Electrical equipment \u00b7 blended allowance",
+        "unit": "each",
+        "rate": 3500.0,
+        "waste": 0.0,
+        "stock": null,
+        "source": "Demonstration catalog, not market pricing",
+        "date": "2026-10-13"
+      }
+    ],
+    "routing_mode": "avoid"
+  }
+}
