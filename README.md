@@ -62,11 +62,12 @@ The assistant is server-side only; keys never reach the browser. Configure one o
 
 | Variable | Purpose |
 |---|---|
-| `GEMINI_API_KEY`, `GEMINI_MODEL` | Google Gemini, using native structured JSON output. Run `scripts/check_gemini.py` to verify the key and list models. |
+| `GEMINI_API_KEY`, `GEMINI_MODEL` | Google Gemini via an AI Studio key, using native structured JSON output. Run `scripts/check_gemini.py` to verify the key and list models. |
+| `GOOGLE_CLOUD_PROJECT`, `GEMINI_MODEL`, `GOOGLE_CLOUD_LOCATION` | Gemini on **Vertex AI** with Application Default Credentials. This is the deployed configuration. The location defaults to `global`, and `GEMINI_THINKING` defaults to `LOW`. |
 | `OPENROUTER_API_KEY`, `OPENROUTER_MODEL` | Any [OpenRouter](https://openrouter.ai/models) model, e.g. `anthropic/claude-sonnet-5.5`. |
-| `BUILDGRAPH_AI_PROVIDER` | `gemini` or `openrouter` forces one. If unset, the first configured provider is used, and Gemini is preferred. |
+| `BUILDGRAPH_AI_PROVIDER` | `gemini`, `vertex` or `openrouter` forces one. If unset, the order is Gemini key, then Vertex AI, then OpenRouter. |
 
-Both providers return the same `AIPlan` and are validated identically. The validation rejects stale revisions, edits with no commands, read-only answers that carry commands, and restricted operations, so a malformed reply never reaches the store. OpenRouter gets the JSON Schema in the prompt rather than through `response_format`. That's because upstream constrained decoding rejects the large command union, so the Pydantic validation is the real gate.
+Every provider returns the same `AIPlan`, and every reply is validated identically. Gemini receives a constrained-decoding schema that lists only the commands the assistant may issue: `$ref`s are inlined, `const` becomes `enum`, and there is no `maxItems`. Each of those constructs made Vertex reject the request. The validation rejects stale revisions, edits with no commands, read-only answers that carry commands, and restricted operations, so a malformed reply never reaches the store. OpenRouter gets the JSON Schema in the prompt rather than through `response_format`. That's because upstream constrained decoding rejects the large command union, so the Pydantic validation is the real gate.
 
 With no provider configured, the assistant says so explicitly. Every manual tool and calculation still works. There are no recorded or simulated AI responses.
 
@@ -90,6 +91,47 @@ The tests cover edit propagation, the engineering calculations against closed-fo
 
 ## Docker and deployment
 
+**Live demo:** https://buildgraph-428497355584.asia-southeast1.run.app (Cloud Run, `asia-southeast1`, project `planchakto`)
+
+The deployed service uses:
+- **Gemini on Vertex AI** (`gemini-3.8-flash`, low thinking), authenticated by the runtime service account, so there is no API key.
+- **Firestore** for the revision index and **Cloud Storage** for snapshots (`BUILDGRAPH_STORAGE=google`).
+- Public access, scaling 0–2 instances. Visitors share one resettable demo workspace.
+
+Redeploy from a clean checkout:
+
+```bash
+./scripts/deploy.sh
+```
+
+The script builds the image on Cloud Build, then deploys to Cloud Run and checks `/api/health`. Source upload honours `.gitignore`, so `.env` and local data are never uploaded. Override `PROJECT`, `REGION`, `GEMINI_MODEL` or `BUCKET` with environment variables. `cloudbuild.yaml` runs the same build and deploy as a Cloud Build pipeline.
+
+One-time project setup:
+
+```bash
+gcloud services enable run.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com firestore.googleapis.com storage.googleapis.com aiplatform.googleapis.com --project=planchakto
+```
+
+```bash
+gcloud firestore databases create --project=planchakto --location=asia-southeast1 --type=firestore-native
+```
+
+```bash
+gcloud storage buckets create gs://planchakto-artifacts --project=planchakto --location=asia-southeast1 --uniform-bucket-level-access --public-access-prevention
+```
+
+```bash
+gcloud artifacts repositories create buildgraph --project=planchakto --location=asia-southeast1 --repository-format=docker
+```
+
+```bash
+gcloud iam service-accounts create buildgraph-runtime --project=planchakto
+```
+
+Then grant the runtime account `roles/datastore.user` and `roles/aiplatform.user` on the project, and `roles/storage.objectAdmin` on the bucket.
+
+To run the container locally:
+
 ```bash
 docker build -t buildgraph .
 ```
@@ -97,14 +139,6 @@ docker build -t buildgraph .
 ```bash
 docker run --rm -p 8080:8080 --env-file .env buildgraph
 ```
-
-`cloudbuild.yaml` builds, pushes and deploys to Cloud Run (`asia-southeast1`) with Firestore and Cloud Storage persistence (`BUILDGRAPH_STORAGE=google`). Before using it, you need to:
-
-- set `_BUCKET` to a private bucket
-- create the `buildgraph-runtime` service account
-- know that it deploys with `--no-allow-unauthenticated`, so a public demo needs that flag changed or a proxy in front
-
-AI keys should go in Secret Manager, not `--set-env-vars`.
 
 ## Project layout
 
