@@ -45,14 +45,17 @@ RESTRICTED={'set_lock','set_site','set_grid','set_brief','set_rate','set_solar',
 
 @functools.cache
 def gemini_schema():
-    """AIPlan schema in the subset Gemini constrained decoding accepts: $refs inlined, const -> enum, oneOf -> anyOf,
-    only assistant-permitted commands, no maxItems (with a large union it overflows the decoding grammar) and no numeric bounds
-    (they corrupted decoded numbers); the 20-command
-    limit is still enforced when the reply is validated against AIPlan)."""
+    """Compact AIPlan schema given to Gemini in the system prompt: only assistant-permitted commands, $refs inlined, no
+    titles, defaults, bounds or nullable unions. Vertex constrained decoding (response_json_schema) rejected the full union
+    and, once accepted, corrupted numbers (a 3.0 m width came back as 3e-128); plain JSON mode with this schema in the prompt
+    returned correct layouts in ~5 s. Replies are validated against the full AIPlan either way."""
     allowed=[c for c in get_args(get_args(Command)[0]) if get_args(c.model_fields['type'].annotation)[0] not in RESTRICTED]
     def conv(n):
         if isinstance(n,dict):
             if '$ref' in n:return conv(defs[n['$ref'].split('/')[-1]])
+            # Nullable unions (anyOf [T, null]) decoded numbers like 3.0 as 3e-128; optional fields become plain T and may be omitted.
+            if 'anyOf' in n and {'type':'null'} in n['anyOf'] and len(n['anyOf'])==2:
+                return conv(next(b for b in n['anyOf'] if b!={'type':'null'})|{k:v for k,v in n.items() if k not in ('anyOf','default')})
             out={}
             for k,v in n.items():
                 # Numeric/length bounds are dropped: with exclusiveMinimum Vertex decoded widths of 3.0 as 3e-10. AIPlan re-validates them.
@@ -104,13 +107,14 @@ def _gemini(payload,vertex=False,attachment=None):
     contents=[types.Part.from_bytes(data=attachment.raw(),mime_type=attachment.mime_type),payload] if attachment else payload
     config=types.GenerateContentConfig(temperature=0,
         # Low thinking keeps text edits at ~5 s; medium/high took 10–35 s for the same typed result on gemini-3.8-flash.
-        thinking_config=types.ThinkingConfig(thinking_level=os.getenv('GEMINI_THINKING','LOW')),response_mime_type='application/json',response_json_schema=gemini_schema(),system_instruction=SYSTEM+(' '+SKETCH if attachment else ''))
+        thinking_config=types.ThinkingConfig(thinking_level=os.getenv('GEMINI_THINKING','LOW')),response_mime_type='application/json',
+        system_instruction=SYSTEM+(' '+SKETCH if attachment else '')+'\nReply with only one JSON object matching this JSON Schema:\n'+json.dumps(gemini_schema()))
     with client:
         for n,model in enumerate(attempts):
             try:
                 t=time.monotonic();res=client.models.generate_content(model=model,contents=contents,config=config);u=getattr(res,'usage_metadata',None)
                 log.info('Gemini %s %.1fs attachment=%s prompt=%s thoughts=%s output=%s',model,time.monotonic()-t,bool(attachment),u and u.prompt_token_count,u and u.thoughts_token_count,u and u.candidates_token_count)
-                return res.text
+                return re.sub(r'^\s*```(?:json)?\s*|\s*```\s*$','',res.text or '')
             except (errors.APIError,httpx.TransportError) as e:
                 if n==len(attempts)-1 or not (isinstance(e,httpx.TransportError) or getattr(e,'code',None) in (429,503,504)):raise
                 log.warning('Gemini %s failed (%s); retrying with %s',model,getattr(e,'code',type(e).__name__),attempts[n+1])
@@ -133,7 +137,7 @@ def interpret(req:AIRequest,snapshot):
     if not p:raise RuntimeError('No AI provider is configured. Set GEMINI_MODEL with GEMINI_API_KEY or GOOGLE_CLOUD_PROJECT (Vertex AI), or OPENROUTER_API_KEY + OPENROUTER_MODEL on the server. Manual commands and all deterministic calculations remain available.')
     payload=json.dumps({'request':req.model_dump(exclude={'attachment'})|({'attachment':req.attachment.name} if req.attachment else {}),'project_data':snapshot['model'],'verified_results':snapshot['results']['summary'],'rules':RULES})
     call=lambda body:_openrouter(body,req.attachment) if p=='openrouter' else _gemini(body,vertex=p=='vertex',attachment=req.attachment)
-    start=time.monotonic();plan=validate_plan(AIPlan.model_validate_json(call(payload)),req)
+    start=time.monotonic();plan=tidy(validate_plan(AIPlan.model_validate_json(call(payload)),req))
     problems=self_check(plan,snapshot)
     # Only correct when there is time left inside Cloud Run's request timeout; otherwise the checks show the problems.
     if problems:log.info('Self-check found %d problem(s) after %.1fs: %s',len(problems),time.monotonic()-start,problems[:3])
@@ -141,8 +145,12 @@ def interpret(req:AIRequest,snapshot):
         # One bounded self-correction pass: show the model what its edit broke and let it repair the commands.
         retry=json.loads(payload)|{'previous_attempt':{'commands':[c.model_dump() for c in plan.commands],'problems':problems,
             'instruction':'Your previous commands caused these problems. Return corrected commands for the same request.'}}
-        plan=validate_plan(AIPlan.model_validate_json(call(json.dumps(retry))),req)
+        plan=tidy(validate_plan(AIPlan.model_validate_json(call(json.dumps(retry))),req))
     return plan
+
+def tidy(plan:AIPlan):
+    """Round model-supplied numbers to millimetres so float noise (3.0000000000000004) cannot break exact geometry checks."""
+    return plan.model_copy(update={'commands':[c.model_copy(update={k:round(v,3) for k,v in c if isinstance(v,float)}) for c in plan.commands]})
 
 def self_check(plan:AIPlan,snapshot):
     """Dry-run an edit through the domain layer and the layout checks; report errors the edit introduced."""

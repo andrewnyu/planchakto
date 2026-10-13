@@ -155,7 +155,7 @@ def fake_gemini(monkeypatch,replies):
     class Models:
         def get(self,model):pass
         def generate_content(self,model,contents,config):
-            calls.append({'model':model,'contents':contents,'system':config.system_instruction})
+            calls.append({'model':model,'contents':contents,'system':config.system_instruction,'schema':config.response_json_schema})
             class R:text=json.dumps(replies[len(calls)-1])
             return R()
     class FakeClient:
@@ -173,6 +173,7 @@ def test_sketch_goes_to_vision_model_as_image_part(client,monkeypatch):
     r=client.post('/api/ai',json={'revision_id':head,'message':'Arrange like this','attachment':{'mime_type':'image/png','data':PNG,'name':'sketch.png'}})
     assert r.status_code==200 and r.json()['candidate']['label']=='Layout from sketch.png'
     assert calls[0]['model']=='pro' and len(calls[0]['contents'])==2 and 'hand sketch' in calls[0]['system']
+    assert calls[0]['schema'] is None and '"move_room"' in calls[0]['system']   # schema in the prompt, not constrained decoding
     assert calls[0]['contents'][0].inline_data.mime_type=='image/png' and 'sketch.png' in calls[0]['contents'][1]
     assert client.post('/api/ai',json={'revision_id':head,'message':'What fails?'}).status_code==200
     assert calls[1]['model']=='flash' and isinstance(calls[1]['contents'],str)   # text-only stays on the text model
@@ -185,7 +186,7 @@ def test_broken_edit_gets_one_self_correction_pass(client,monkeypatch):
     r=client.post('/api/ai',json={'revision_id':head,'message':'Move the bathroom'})
     assert r.status_code==200 and r.json()['interpretation']['explanation']=='v2' and len(calls)==2
     retry=json.loads(calls[1]['contents'])['previous_attempt']
-    assert retry['commands'][0]['w']==3e-17 and any('Bathroom' in p for p in retry['problems'])
+    assert retry['commands'][0]['room_id']=='bath' and retry['problems']   # 3e-17 rounds to 0 m: rejected by the domain layer
 
 @pytest.mark.parametrize('attachment',[{'mime_type':'image/png','data':'not base64!!'},{'mime_type':'image/png','data':''},{'mime_type':'image/gif','data':PNG}])
 def test_bad_attachments_are_rejected_before_any_model_call(client,monkeypatch,attachment):
@@ -221,3 +222,9 @@ def test_drawing_falls_back_to_text_model_when_vision_model_times_out(client,mon
     r=client.post('/api/ai',json={'revision_id':head,'message':'Like this','attachment':{'mime_type':'image/png','data':PNG}})
     assert r.status_code==200 and r.json()['interpretation']['action']=='clarify'
     assert [c['model'] for c in calls]==['pro','flash']
+
+def test_model_numbers_are_rounded_to_millimetres(client,monkeypatch):
+    head=client.get('/api/project').json()['state']['head']
+    fake_gemini(monkeypatch,[{'revision_id':head,'action':'edit','explanation':'x','commands':[{'type':'move_room','room_id':'bath','x':9.0000000000000004,'y':0.00049,'w':3.0000000000000004}]}])
+    cmd=client.post('/api/ai',json={'revision_id':head,'message':'Move'}).json()['interpretation']['commands'][0]
+    assert (cmd['x'],cmd['y'],cmd['w'])==(9.0,0.0,3.0)
