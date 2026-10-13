@@ -134,3 +134,12 @@ def test_vertex_uses_adc_client_with_project_and_location(client,monkeypatch):
     r=client.post('/api/ai',json={'revision_id':head,'message':'Which rules apply?'})
     assert r.status_code==200 and r.json()['interpretation']['action']=='rules'
     assert made['vertexai'] is True and made['project']=='proj' and made['location']=='us-central1' and 'api_key' not in made and made['checked']=='gemini-test'
+
+def test_gemini_schema_is_decodable_subset_and_validation_still_enforces_limits():
+    from backend.ai import gemini_schema,RESTRICTED
+    text=json.dumps(gemini_schema())
+    assert '$ref' not in text and '"const"' not in text and 'maxItems' not in text and 'oneOf' not in text
+    types={x['properties']['type']['enum'][0] for x in gemini_schema()['properties']['commands']['items']['anyOf']}
+    assert types and not types&RESTRICTED and 'move_room' in types
+    too_many={'revision_id':'a','action':'edit','explanation':'x','commands':[{'type':'reroute'}]*21}
+    with pytest.raises(Exception):AIPlan.model_validate(too_many)

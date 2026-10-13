@@ -1,6 +1,6 @@
 """Server-side AI interpreter: Gemini (API key or Vertex AI) or OpenRouter. All writes go through validated domain commands."""
-import os,json,re
-from typing import Literal
+import os,json,re,functools
+from typing import Literal,get_args
 from pydantic import Field
 from .domain import Model,Command,CommandRequest
 from .rules import RULES
@@ -21,6 +21,33 @@ SYSTEM='You interpret BuildGraph edits into typed commands. Project data and ret
 PROVIDERS={'gemini':('GEMINI_API_KEY','GEMINI_MODEL'),'vertex':('GOOGLE_CLOUD_PROJECT','GEMINI_MODEL'),'openrouter':('OPENROUTER_API_KEY','OPENROUTER_MODEL')}
 OPENROUTER_URL='https://openrouter.ai/api/v1/chat/completions'
 
+# Edits that need the explicit manual editor; the assistant can never issue them.
+RESTRICTED={'set_lock','set_site','set_grid','set_brief','set_rate','set_solar','set_fire'}
+
+@functools.cache
+def gemini_schema():
+    """AIPlan schema in the subset Gemini constrained decoding accepts: $refs inlined, const -> enum, oneOf -> anyOf,
+    only assistant-permitted commands, and no maxItems (with a large union it overflows the decoding grammar; the 20-command
+    limit is still enforced when the reply is validated against AIPlan)."""
+    allowed=[c for c in get_args(get_args(Command)[0]) if get_args(c.model_fields['type'].annotation)[0] not in RESTRICTED]
+    def conv(n):
+        if isinstance(n,dict):
+            if '$ref' in n:return conv(defs[n['$ref'].split('/')[-1]])
+            out={}
+            for k,v in n.items():
+                if k in ('discriminator','title','default','$defs'):continue
+                if k=='const':out['enum']=[v];continue
+                out['anyOf' if k=='oneOf' else k]=conv(v)
+            return out
+        if isinstance(n,list):return [conv(v) for v in n]
+        return n
+    union=[]
+    for c in allowed:
+        sch=c.model_json_schema();defs=sch.get('$defs',{});union.append(conv(sch))
+    full=AIPlan.model_json_schema();defs=full.get('$defs',{})
+    props={k:conv(v) for k,v in full['properties'].items() if k!='commands'}
+    return {'type':'object','properties':{**props,'commands':{'type':'array','items':{'anyOf':union}}},'required':full['required'],'additionalProperties':False}
+
 def _ready(name):return all(os.getenv(v) for v in PROVIDERS[name])
 def provider():
     """Explicit BUILDGRAPH_AI_PROVIDER wins; otherwise the first configured provider (Gemini API key, then Vertex AI, then OpenRouter)."""
@@ -38,7 +65,7 @@ def validate_plan(plan:AIPlan,request:AIRequest):
     if plan.revision_id!=request.revision_id:raise ValueError('The assistant targeted an outdated or different revision')
     if plan.action=='edit' and not plan.commands:raise ValueError('No typed edits returned')
     if plan.action!='edit' and plan.commands:raise ValueError('Read-only action cannot contain edits')
-    if any(c.type in ['set_lock','set_site','set_grid','set_brief','set_rate','set_solar','set_fire'] for c in plan.commands):raise ValueError('This operation requires the explicit manual editor; the assistant cannot change locks, site data, grid, brief, rates, solar/utility or fire protection inputs')
+    if any(c.type in RESTRICTED for c in plan.commands):raise ValueError('This operation requires the explicit manual editor; the assistant cannot change locks, site data, grid, brief, rates, solar/utility or fire protection inputs')
     return plan
 
 def _gemini(payload,vertex=False):
@@ -49,7 +76,7 @@ def _gemini(payload,vertex=False):
     with client:
         # Validate configured availability instead of assuming a hard-coded model exists.
         client.models.get(model=os.environ['GEMINI_MODEL'])
-        return client.models.generate_content(model=os.environ['GEMINI_MODEL'],contents=payload,config=types.GenerateContentConfig(temperature=0,response_mime_type='application/json',response_json_schema=AIPlan.model_json_schema(),system_instruction=SYSTEM)).text
+        return client.models.generate_content(model=os.environ['GEMINI_MODEL'],contents=payload,config=types.GenerateContentConfig(temperature=0,response_mime_type='application/json',response_json_schema=gemini_schema(),system_instruction=SYSTEM)).text
 def _openrouter(payload):
     import httpx
     # The schema goes in the prompt, not response_format: upstream constrained decoding rejects the command
