@@ -71,12 +71,14 @@ def validate_plan(plan:AIPlan,request:AIRequest):
 def _gemini(payload,vertex=False):
     from google import genai
     from google.genai import types
-    options=types.HttpOptions(timeout=30000)
+    options=types.HttpOptions(timeout=60000)
     client=genai.Client(vertexai=True,project=os.environ['GOOGLE_CLOUD_PROJECT'],location=os.getenv('GOOGLE_CLOUD_LOCATION','global'),http_options=options) if vertex else genai.Client(api_key=os.environ['GEMINI_API_KEY'],http_options=options)
     with client:
         # Validate configured availability instead of assuming a hard-coded model exists.
         client.models.get(model=os.environ['GEMINI_MODEL'])
-        return client.models.generate_content(model=os.environ['GEMINI_MODEL'],contents=payload,config=types.GenerateContentConfig(temperature=0,response_mime_type='application/json',response_json_schema=gemini_schema(),system_instruction=SYSTEM)).text
+        return client.models.generate_content(model=os.environ['GEMINI_MODEL'],contents=payload,config=types.GenerateContentConfig(temperature=0,
+            # Low thinking keeps edits at ~5 s; medium/high took 10–35 s for the same typed result on gemini-3.8-flash.
+            thinking_config=types.ThinkingConfig(thinking_level=os.getenv('GEMINI_THINKING','LOW')),response_mime_type='application/json',response_json_schema=gemini_schema(),system_instruction=SYSTEM)).text
 def _openrouter(payload):
     import httpx
     # The schema goes in the prompt, not response_format: upstream constrained decoding rejects the command

@@ -1,5 +1,5 @@
 from __future__ import annotations
-import os,io,csv,json,uuid,html
+import os,io,csv,json,uuid,html,logging
 from pathlib import Path
 from fastapi import FastAPI,Request
 from fastapi.responses import JSONResponse,Response,HTMLResponse
@@ -17,6 +17,7 @@ from .layout import generate_layouts
 from .ai import AIRequest,interpret,status
 
 app=FastAPI(title='BuildGraph',version='0.1.0')
+log=logging.getLogger('buildgraph')
 _store=None
 def store():
     global _store
@@ -88,7 +89,9 @@ def ai(req:AIRequest):
     s=store().get(req.revision_id)
     try:plan=interpret(req,s)
     except RuntimeError as e:return JSONResponse(status_code=503,content={'detail':str(e),'mode':'unavailable'})
-    except Exception as e:return JSONResponse(status_code=502,content={'detail':f'AI request or validation failed ({type(e).__name__}). No changes were applied.','mode':'error'})
+    except Exception as e:
+        log.exception('Assistant request failed')
+        return JSONResponse(status_code=502,content={'detail':f'AI request or validation failed ({type(e).__name__}). No changes were applied.','mode':'error'})
     response={'mode':'live','interpretation':plan.model_dump(),'candidate':None,'evidence':None}
     if plan.action=='edit':
         candidate=store().preview(CommandRequest(base_revision=req.revision_id,command_id=uuid.uuid4().hex,label='Assistant proposed edit',commands=plan.commands));response['candidate']=candidate

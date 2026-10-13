@@ -123,6 +123,7 @@ def test_vertex_uses_adc_client_with_project_and_location(client,monkeypatch):
     class Models:
         def get(self,model):made['checked']=model
         def generate_content(self,model,contents,config):
+            made['thinking']=config.thinking_config.thinking_level
             class R:text=json.dumps({'revision_id':head,'action':'rules','explanation':'Rule inventory'})
             return R()
     class FakeClient:
@@ -133,7 +134,7 @@ def test_vertex_uses_adc_client_with_project_and_location(client,monkeypatch):
     assert client.get('/api/health').json()['ai_provider']=='vertex'
     r=client.post('/api/ai',json={'revision_id':head,'message':'Which rules apply?'})
     assert r.status_code==200 and r.json()['interpretation']['action']=='rules'
-    assert made['vertexai'] is True and made['project']=='proj' and made['location']=='us-central1' and 'api_key' not in made and made['checked']=='gemini-test'
+    assert made['vertexai'] is True and made['project']=='proj' and made['location']=='us-central1' and 'api_key' not in made and made['checked']=='gemini-test' and made['thinking']=='LOW'
 
 def test_gemini_schema_is_decodable_subset_and_validation_still_enforces_limits():
     from backend.ai import gemini_schema,RESTRICTED
