@@ -108,7 +108,7 @@ def _gemini(payload,vertex=False,attachment=None):
     with client:
         for n,model in enumerate(attempts):
             try:
-                t=time.monotonic();res=client.models.generate_content(model=model,contents=contents,config=config);u=res.usage_metadata
+                t=time.monotonic();res=client.models.generate_content(model=model,contents=contents,config=config);u=getattr(res,'usage_metadata',None)
                 log.info('Gemini %s %.1fs attachment=%s prompt=%s thoughts=%s output=%s',model,time.monotonic()-t,bool(attachment),u and u.prompt_token_count,u and u.thoughts_token_count,u and u.candidates_token_count)
                 return res.text
             except (errors.APIError,httpx.TransportError) as e:
