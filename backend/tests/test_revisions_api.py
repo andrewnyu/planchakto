@@ -9,7 +9,7 @@ import backend.main as main
 def store(tmp_path):return LocalStore(str(tmp_path/'test.sqlite3'))
 @pytest.fixture
 def client(store,monkeypatch):
-    monkeypatch.setattr(main,'_store',store);monkeypatch.delenv('GEMINI_API_KEY',raising=False);monkeypatch.delenv('OPENROUTER_API_KEY',raising=False);monkeypatch.delenv('BUILDGRAPH_AI_PROVIDER',raising=False)
+    monkeypatch.setattr(main,'_store',store);monkeypatch.delenv('GEMINI_API_KEY',raising=False);monkeypatch.delenv('OPENROUTER_API_KEY',raising=False);monkeypatch.delenv('BUILDGRAPH_AI_PROVIDER',raising=False);monkeypatch.delenv('GOOGLE_CLOUD_PROJECT',raising=False)
     return TestClient(main.app)
 def request(base,id='cmd1',load=1.5):return CommandRequest(base_revision=base,command_id=id,label='Load update',commands=[{'type':'set_parameter','field':'live','value':load}])
 
@@ -77,7 +77,7 @@ def test_ai_plan_evaluation_contract(action,commands,revision,valid):
         with pytest.raises(ValueError):validate_plan(plan,req)
 
 import json,backend.ai as ai
-AI_ENV=('GEMINI_API_KEY','GEMINI_MODEL','OPENROUTER_API_KEY','OPENROUTER_MODEL','BUILDGRAPH_AI_PROVIDER')
+AI_ENV=('GEMINI_API_KEY','GEMINI_MODEL','GOOGLE_CLOUD_PROJECT','OPENROUTER_API_KEY','OPENROUTER_MODEL','BUILDGRAPH_AI_PROVIDER')
 @pytest.mark.parametrize('env,expected',[
     ({},None),
     ({'GEMINI_API_KEY':'k'},None),
@@ -85,6 +85,9 @@ AI_ENV=('GEMINI_API_KEY','GEMINI_MODEL','OPENROUTER_API_KEY','OPENROUTER_MODEL',
     ({'GEMINI_API_KEY':'k','GEMINI_MODEL':'g','OPENROUTER_API_KEY':'k','OPENROUTER_MODEL':'m'},'gemini'),
     ({'GEMINI_API_KEY':'k','GEMINI_MODEL':'g','OPENROUTER_API_KEY':'k','OPENROUTER_MODEL':'m','BUILDGRAPH_AI_PROVIDER':'openrouter'},'openrouter'),
     ({'GEMINI_API_KEY':'k','GEMINI_MODEL':'g','BUILDGRAPH_AI_PROVIDER':'openrouter'},None),
+    ({'GOOGLE_CLOUD_PROJECT':'p','GEMINI_MODEL':'g'},'vertex'),
+    ({'GOOGLE_CLOUD_PROJECT':'p','GEMINI_MODEL':'g','OPENROUTER_API_KEY':'k','OPENROUTER_MODEL':'m'},'vertex'),
+    ({'GOOGLE_CLOUD_PROJECT':'p','BUILDGRAPH_AI_PROVIDER':'vertex'},None),
 ])
 def test_ai_provider_selection(monkeypatch,env,expected):
     for k in AI_ENV:monkeypatch.delenv(k,raising=False)
@@ -111,3 +114,23 @@ def test_openrouter_response_is_validated_like_gemini(client,monkeypatch):
     monkeypatch.setattr(httpx,'post',lambda *a,**k:Resp(json.dumps({'revision_id':'stale','action':'inspect','explanation':'x'})))
     r=client.post('/api/ai',json={'revision_id':head,'message':'What fails?'})
     assert r.status_code==502 and r.json()['mode']=='error'
+
+def test_vertex_uses_adc_client_with_project_and_location(client,monkeypatch):
+    for k in AI_ENV:monkeypatch.delenv(k,raising=False)
+    monkeypatch.setenv('GOOGLE_CLOUD_PROJECT','proj');monkeypatch.setenv('GEMINI_MODEL','gemini-test');monkeypatch.setenv('GOOGLE_CLOUD_LOCATION','us-central1')
+    head=client.get('/api/project').json()['state']['head'];made={}
+    from google import genai
+    class Models:
+        def get(self,model):made['checked']=model
+        def generate_content(self,model,contents,config):
+            class R:text=json.dumps({'revision_id':head,'action':'rules','explanation':'Rule inventory'})
+            return R()
+    class FakeClient:
+        def __init__(self,**kw):made.update(kw);self.models=Models()
+        def __enter__(self):return self
+        def __exit__(self,*a):pass
+    monkeypatch.setattr(genai,'Client',FakeClient)
+    assert client.get('/api/health').json()['ai_provider']=='vertex'
+    r=client.post('/api/ai',json={'revision_id':head,'message':'Which rules apply?'})
+    assert r.status_code==200 and r.json()['interpretation']['action']=='rules'
+    assert made['vertexai'] is True and made['project']=='proj' and made['location']=='us-central1' and 'api_key' not in made and made['checked']=='gemini-test'
