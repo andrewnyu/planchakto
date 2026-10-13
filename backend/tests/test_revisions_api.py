@@ -144,3 +144,60 @@ def test_gemini_schema_is_decodable_subset_and_validation_still_enforces_limits(
     assert types and not types&RESTRICTED and 'move_room' in types
     too_many={'revision_id':'a','action':'edit','explanation':'x','commands':[{'type':'reroute'}]*21}
     with pytest.raises(Exception):AIPlan.model_validate(too_many)
+
+import base64
+PNG=base64.b64encode(b'\x89PNG\r\n\x1a\n'+b'0'*64).decode()
+def fake_gemini(monkeypatch,replies):
+    """Stub google-genai: records each call and returns queued JSON replies."""
+    from google import genai
+    calls=[]
+    class Models:
+        def get(self,model):pass
+        def generate_content(self,model,contents,config):
+            calls.append({'model':model,'contents':contents,'system':config.system_instruction})
+            class R:text=json.dumps(replies[len(calls)-1])
+            return R()
+    class FakeClient:
+        def __init__(self,**kw):self.models=Models()
+        def __enter__(self):return self
+        def __exit__(self,*a):pass
+    monkeypatch.setattr(genai,'Client',FakeClient)
+    for k in AI_ENV:monkeypatch.delenv(k,raising=False)
+    monkeypatch.setenv('GOOGLE_CLOUD_PROJECT','p');monkeypatch.setenv('GEMINI_MODEL','flash');monkeypatch.setenv('GEMINI_VISION_MODEL','pro')
+    return calls
+
+def test_sketch_goes_to_vision_model_as_image_part(client,monkeypatch):
+    head=client.get('/api/project').json()['state']['head']
+    calls=fake_gemini(monkeypatch,[{'revision_id':head,'action':'edit','explanation':'Swap per sketch','commands':[{'type':'swap_rooms','first':'bath','second':'kitchen'}]},{'revision_id':head,'action':'inspect','explanation':'review'}])
+    r=client.post('/api/ai',json={'revision_id':head,'message':'Arrange like this','attachment':{'mime_type':'image/png','data':PNG,'name':'sketch.png'}})
+    assert r.status_code==200 and r.json()['candidate']['label']=='Layout from sketch.png'
+    assert calls[0]['model']=='pro' and len(calls[0]['contents'])==2 and 'hand sketch' in calls[0]['system']
+    assert calls[0]['contents'][0].inline_data.mime_type=='image/png' and 'sketch.png' in calls[0]['contents'][1]
+    assert client.post('/api/ai',json={'revision_id':head,'message':'What fails?'}).status_code==200
+    assert calls[1]['model']=='flash' and isinstance(calls[1]['contents'],str)   # text-only stays on the text model
+
+def test_broken_edit_gets_one_self_correction_pass(client,monkeypatch):
+    head=client.get('/api/project').json()['state']['head']
+    bad={'revision_id':head,'action':'edit','explanation':'v1','commands':[{'type':'move_room','room_id':'bath','x':9,'y':0,'w':3e-17}]}
+    good={'revision_id':head,'action':'edit','explanation':'v2','commands':[{'type':'swap_rooms','first':'bath','second':'kitchen'}]}
+    calls=fake_gemini(monkeypatch,[bad,good])
+    r=client.post('/api/ai',json={'revision_id':head,'message':'Move the bathroom'})
+    assert r.status_code==200 and r.json()['interpretation']['explanation']=='v2' and len(calls)==2
+    retry=json.loads(calls[1]['contents'])['previous_attempt']
+    assert retry['commands'][0]['w']==3e-17 and any('Bathroom' in p for p in retry['problems'])
+
+@pytest.mark.parametrize('attachment',[{'mime_type':'image/png','data':'not base64!!'},{'mime_type':'image/png','data':''},{'mime_type':'image/gif','data':PNG}])
+def test_bad_attachments_are_rejected_before_any_model_call(client,monkeypatch,attachment):
+    head=client.get('/api/project').json()['state']['head'];calls=fake_gemini(monkeypatch,[])
+    assert client.post('/api/ai',json={'revision_id':head,'message':'x','attachment':attachment}).status_code==422 and not calls
+
+def test_openrouter_sends_image_as_data_url(client,monkeypatch):
+    for k in AI_ENV:monkeypatch.delenv(k,raising=False)
+    monkeypatch.setenv('OPENROUTER_API_KEY','k');monkeypatch.setenv('OPENROUTER_MODEL','m')
+    head=client.get('/api/project').json()['state']['head'];sent={}
+    class Resp:
+        def raise_for_status(self):pass
+        def json(self):return {'choices':[{'message':{'content':json.dumps({'revision_id':head,'action':'clarify','explanation':'unreadable'})}}]}
+    import httpx;monkeypatch.setattr(httpx,'post',lambda url,**kw:sent.update(kw['json']) or Resp())
+    r=client.post('/api/ai',json={'revision_id':head,'message':'Like this','attachment':{'mime_type':'image/png','data':PNG}})
+    assert r.status_code==200 and sent['messages'][1]['content'][1]['image_url']['url'].startswith('data:image/png;base64,')

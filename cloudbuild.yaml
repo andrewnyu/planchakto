@@ -19,11 +19,12 @@ steps:
       - '--timeout=120'
       - '--min-instances=0'
       - '--max-instances=2'
-      - '--set-env-vars=BUILDGRAPH_STORAGE=google,GOOGLE_CLOUD_PROJECT=$PROJECT_ID,BUILDGRAPH_BUCKET=${_BUCKET},BUILDGRAPH_WORKSPACE=demo,BUILDGRAPH_AI_PROVIDER=vertex,GEMINI_MODEL=${_GEMINI_MODEL},GOOGLE_CLOUD_LOCATION=global,OPENBLAS_NUM_THREADS=1'
+      - '--set-env-vars=BUILDGRAPH_STORAGE=google,GOOGLE_CLOUD_PROJECT=$PROJECT_ID,BUILDGRAPH_BUCKET=${_BUCKET},BUILDGRAPH_WORKSPACE=demo,BUILDGRAPH_AI_PROVIDER=vertex,GEMINI_MODEL=${_GEMINI_MODEL},GEMINI_VISION_MODEL=${_GEMINI_VISION_MODEL},GOOGLE_CLOUD_LOCATION=global,OPENBLAS_NUM_THREADS=1'
 substitutions:
   _REGION: asia-southeast1
   _BUCKET: planchakto-artifacts
   _GEMINI_MODEL: gemini-3.8-flash
+  _GEMINI_VISION_MODEL: gemini-3.1-pro-preview
 images:
   - '${_REGION}-docker.pkg.dev/$PROJECT_ID/buildgraph/app:$BUILD_ID'
 options:

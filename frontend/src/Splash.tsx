@@ -4,7 +4,7 @@ import {money,num} from './api';
 
 const features=[
  {icon:GitBranch,title:'See every change before you accept it',text:'Each edit becomes a candidate revision. Geometry, checks and cost differences are shown side by side, and the accepted design is never overwritten.'},
- {icon:Sparkles,title:'Gemini design assistant',text:'Describe a change in plain language. Gemini turns it into typed edits that run through exactly the same checks as a manual edit.'},
+ {icon:Sparkles,title:'Gemini design assistant',text:'Describe a change in plain language, or upload a hand sketch, photo or existing plan. Gemini turns it into typed edits that run through exactly the same checks as a manual edit.'},
  {icon:Columns3,title:'Structural checks',text:'Roof beams solved with finite elements, footing bearing, and section alternatives when a member fails.'},
  {icon:Droplets,title:'Services routing',text:'Water, drain and conduit routed around columns, with gravity-fall checks on every drain run.'},
  {icon:Sun,title:'Rooftop solar',text:'Panel fit, added roof load, inverter breaker, transformer, hosting-capacity and net-metering screens.'},
@@ -14,7 +14,7 @@ const features=[
 ];
 const steps=[
  {icon:PlayCircle,title:'Open the demo project',text:'San Isidro Studio is a synthetic 12 × 9 m building with six rooms, a corridor and a steel roof grid.'},
- {icon:MousePointer2,title:'Make a change',text:'Drag a room with the Move tool, edit loads in the inspector, or ask the design assistant from the sidebar.'},
+ {icon:MousePointer2,title:'Make a change',text:'Drag a room with the Move tool, edit loads in the inspector, or ask the design assistant — in words or with a sketch of the layout you want.'},
  {icon:CheckCircle2,title:'Review the candidate',text:'The banner shows the cost change. Checks lists what passes, fails, needs input or is outside scope — with the evidence.'},
  {icon:ShieldCheck,title:'Apply, discard or undo',text:'Apply when you are satisfied. Every accepted revision is kept, so you can compare, undo and redo at any time.'},
  {icon:Sun,title:'Screen solar and fire',text:'In the Engineering tab, add a rooftop array or screen fire protection. Both draw on the plan.'},

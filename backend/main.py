@@ -87,6 +87,7 @@ def import_survey(req:SurveyRequest):
 @app.post('/api/ai')
 def ai(req:AIRequest):
     s=store().get(req.revision_id)
+    if req.attachment:req.attachment.raw()  # malformed uploads are a 422, not a model failure
     try:plan=interpret(req,s)
     except RuntimeError as e:return JSONResponse(status_code=503,content={'detail':str(e),'mode':'unavailable'})
     except Exception as e:
@@ -94,7 +95,7 @@ def ai(req:AIRequest):
         return JSONResponse(status_code=502,content={'detail':f'AI request or validation failed ({type(e).__name__}). No changes were applied.','mode':'error'})
     response={'mode':'live','interpretation':plan.model_dump(),'candidate':None,'evidence':None}
     if plan.action=='edit':
-        candidate=store().preview(CommandRequest(base_revision=req.revision_id,command_id=uuid.uuid4().hex,label='Assistant proposed edit',commands=plan.commands));response['candidate']=candidate
+        candidate=store().preview(CommandRequest(base_revision=req.revision_id,command_id=uuid.uuid4().hex,label=f'Layout from {req.attachment.name}'[:120] if req.attachment else 'Assistant proposed edit',commands=plan.commands));response['candidate']=candidate
         response['evidence']={'summary':candidate['results']['summary'],'invalidated':candidate['invalidated'],'comparison':compare(s['results'],candidate['results'],s['model'],candidate['model'])}
     elif plan.action=='analyze':response['candidate']=store().rerun(req.revision_id)
     elif plan.action=='alternatives':response['evidence']=layouts(req.revision_id)
