@@ -134,7 +134,7 @@ def test_vertex_uses_adc_client_with_project_and_location(client,monkeypatch):
     assert client.get('/api/health').json()['ai_provider']=='vertex'
     r=client.post('/api/ai',json={'revision_id':head,'message':'Which rules apply?'})
     assert r.status_code==200 and r.json()['interpretation']['action']=='rules'
-    assert made['vertexai'] is True and made['project']=='proj' and made['location']=='us-central1' and 'api_key' not in made and made['checked']=='gemini-test' and made['thinking']=='LOW'
+    assert made['vertexai'] is True and made['project']=='proj' and made['location']=='us-central1' and 'api_key' not in made and made['thinking']=='LOW'
 
 def test_gemini_schema_is_decodable_subset_and_validation_still_enforces_limits():
     from backend.ai import gemini_schema,RESTRICTED
@@ -202,3 +202,22 @@ def test_openrouter_sends_image_as_data_url(client,monkeypatch):
     import httpx;monkeypatch.setattr(httpx,'post',lambda url,**kw:sent.update(kw['json']) or Resp())
     r=client.post('/api/ai',json={'revision_id':head,'message':'Like this','attachment':{'mime_type':'image/png','data':PNG}})
     assert r.status_code==200 and sent['messages'][1]['content'][1]['image_url']['url'].startswith('data:image/png;base64,')
+
+def test_drawing_falls_back_to_text_model_when_vision_model_times_out(client,monkeypatch):
+    from google.genai import errors
+    head=client.get('/api/project').json()['state']['head']
+    reply={'revision_id':head,'action':'clarify','explanation':'unreadable'}
+    calls=fake_gemini(monkeypatch,[None,reply])
+    from google import genai
+    Original=genai.Client
+    class Flaky(Original):
+        def __init__(self,**kw):
+            super().__init__(**kw);inner=self.models.generate_content
+            def generate(model,contents,config):
+                if model=='pro':calls.append({'model':model});raise errors.ServerError(504,{'error':{'message':'Deadline expired','status':'DEADLINE_EXCEEDED'}})
+                return inner(model,contents,config)
+            self.models.generate_content=generate
+    monkeypatch.setattr(genai,'Client',Flaky)
+    r=client.post('/api/ai',json={'revision_id':head,'message':'Like this','attachment':{'mime_type':'image/png','data':PNG}})
+    assert r.status_code==200 and r.json()['interpretation']['action']=='clarify'
+    assert [c['model'] for c in calls]==['pro','flash']

@@ -1,9 +1,11 @@
 """Server-side AI interpreter: Gemini (API key or Vertex AI) or OpenRouter. All writes go through validated domain commands."""
-import os,json,re,base64,binascii,functools
+import os,json,re,time,base64,binascii,functools,logging
 from typing import Literal,get_args
 from pydantic import Field
 from .domain import Model,Command,CommandRequest,Building,apply_commands
 from .rules import RULES
+
+log=logging.getLogger('buildgraph.ai')
 
 MAX_ATTACHMENT=8*1024*1024
 class Attachment(Model):
@@ -89,23 +91,27 @@ def validate_plan(plan:AIPlan,request:AIRequest):
     return plan
 
 def _gemini(payload,vertex=False,attachment=None):
+    import httpx
     from google import genai
-    from google.genai import types
-    # Preview models on a new project hit shared-quota 429s and occasional 503/504s: retry twice with backoff.
-    options=types.HttpOptions(timeout=60000,retry_options=types.HttpRetryOptions(attempts=3,initial_delay=2,max_delay=10,http_status_codes=[429,503,504]))
+    from google.genai import errors,types
+    # Retry only fast failures (quota 429, overload 503) inside a call; a slow 504 moves on to the fallback model instead,
+    # so attempts never stack past Cloud Run's request timeout.
+    options=types.HttpOptions(timeout=75000,retry_options=types.HttpRetryOptions(attempts=2,initial_delay=2,max_delay=6,http_status_codes=[429,503]))
     client=genai.Client(vertexai=True,project=os.environ['GOOGLE_CLOUD_PROJECT'],location=os.getenv('GOOGLE_CLOUD_LOCATION','global'),http_options=options) if vertex else genai.Client(api_key=os.environ['GEMINI_API_KEY'],http_options=options)
+    text_model=os.environ['GEMINI_MODEL']
+    # Drawings go to the larger vision model first, falling back to the text model (both read sketches correctly once
+    # numeric bounds were removed from the schema; the preview Pro model has tighter quota). Text gets one retry.
+    attempts=[os.getenv('GEMINI_VISION_MODEL') or text_model,text_model] if attachment else [text_model,text_model]
+    contents=[types.Part.from_bytes(data=attachment.raw(),mime_type=attachment.mime_type),payload] if attachment else payload
+    config=types.GenerateContentConfig(temperature=0,
+        # Low thinking keeps text edits at ~5 s; medium/high took 10–35 s for the same typed result on gemini-3.8-flash.
+        thinking_config=types.ThinkingConfig(thinking_level=os.getenv('GEMINI_THINKING','LOW')),response_mime_type='application/json',response_json_schema=gemini_schema(),system_instruction=SYSTEM+(' '+SKETCH if attachment else ''))
     with client:
-        # Validate configured availability instead of assuming a hard-coded model exists.
-        # Drawings go to the (larger) vision model when configured: Flash garbled dimensions on sketches that Pro read exactly.
-        model=os.getenv('GEMINI_VISION_MODEL') or os.environ['GEMINI_MODEL'] if attachment else os.environ['GEMINI_MODEL']
-        client.models.get(model=model)
-        contents=[types.Part.from_bytes(data=attachment.raw(),mime_type=attachment.mime_type),payload] if attachment else payload
-        generate=lambda:client.models.generate_content(model=model,contents=contents,config=types.GenerateContentConfig(temperature=0,
-            # Low thinking keeps edits at ~5 s; medium/high took 10–35 s for the same typed result on gemini-3.8-flash.
-            thinking_config=types.ThinkingConfig(thinking_level=os.getenv('GEMINI_THINKING','LOW')),response_mime_type='application/json',response_json_schema=gemini_schema(),system_instruction=SYSTEM+(' '+SKETCH if attachment else ''))).text
-        import httpx
-        try:return generate()
-        except httpx.TransportError:return generate()  # dropped connections are not covered by the SDK's status-code retry
+        for n,model in enumerate(attempts):
+            try:return client.models.generate_content(model=model,contents=contents,config=config).text
+            except (errors.APIError,httpx.TransportError) as e:
+                if n==len(attempts)-1 or not (isinstance(e,httpx.TransportError) or getattr(e,'code',None) in (429,503,504)):raise
+                log.warning('Gemini %s failed (%s); retrying with %s',model,getattr(e,'code',type(e).__name__),attempts[n+1])
 def _openrouter(payload,attachment=None):
     import httpx
     # The schema goes in the prompt, not response_format: upstream constrained decoding rejects the command
@@ -125,9 +131,10 @@ def interpret(req:AIRequest,snapshot):
     if not p:raise RuntimeError('No AI provider is configured. Set GEMINI_MODEL with GEMINI_API_KEY or GOOGLE_CLOUD_PROJECT (Vertex AI), or OPENROUTER_API_KEY + OPENROUTER_MODEL on the server. Manual commands and all deterministic calculations remain available.')
     payload=json.dumps({'request':req.model_dump(exclude={'attachment'})|({'attachment':req.attachment.name} if req.attachment else {}),'project_data':snapshot['model'],'verified_results':snapshot['results']['summary'],'rules':RULES})
     call=lambda body:_openrouter(body,req.attachment) if p=='openrouter' else _gemini(body,vertex=p=='vertex',attachment=req.attachment)
-    plan=validate_plan(AIPlan.model_validate_json(call(payload)),req)
+    start=time.monotonic();plan=validate_plan(AIPlan.model_validate_json(call(payload)),req)
     problems=self_check(plan,snapshot)
-    if problems:
+    # Only correct when there is time left inside Cloud Run's request timeout; otherwise the checks show the problems.
+    if problems and time.monotonic()-start<50:
         # One bounded self-correction pass: show the model what its edit broke and let it repair the commands.
         retry=json.loads(payload)|{'previous_attempt':{'commands':[c.model_dump() for c in plan.commands],'problems':problems,
             'instruction':'Your previous commands caused these problems. Return corrected commands for the same request.'}}
