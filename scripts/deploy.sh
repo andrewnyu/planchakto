@@ -9,8 +9,9 @@ REGION=${REGION:-asia-southeast1}
 SERVICE=${SERVICE:-buildgraph}
 BUCKET=${BUCKET:-$PROJECT-artifacts}
 GEMINI_MODEL=${GEMINI_MODEL:-gemini-3.8-flash}
-# Drawings (multimodal) go to the larger model: Flash garbled sketch dimensions that Pro read exactly.
-GEMINI_VISION_MODEL=${GEMINI_VISION_MODEL:-gemini-3.1-pro-preview}
+# Model for drawings (multimodal). Flash reads sketches correctly in ~10-20 s; gemini-3.1-pro-preview also works but its
+# preview quota on this project made it slow (504s), so it is opt-in.
+GEMINI_VISION_MODEL=${GEMINI_VISION_MODEL:-gemini-3.8-flash}
 SA=buildgraph-runtime@$PROJECT.iam.gserviceaccount.com
 IMAGE=$REGION-docker.pkg.dev/$PROJECT/buildgraph/app:$(git rev-parse --short HEAD)$(git diff --quiet || echo -dirty)
 

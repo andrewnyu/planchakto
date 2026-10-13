@@ -24,7 +24,7 @@ substitutions:
   _REGION: asia-southeast1
   _BUCKET: planchakto-artifacts
   _GEMINI_MODEL: gemini-3.8-flash
-  _GEMINI_VISION_MODEL: gemini-3.1-pro-preview
+  _GEMINI_VISION_MODEL: gemini-3.8-flash
 images:
   - '${_REGION}-docker.pkg.dev/$PROJECT_ID/buildgraph/app:$BUILD_ID'
 options:

@@ -99,8 +99,7 @@ def _gemini(payload,vertex=False,attachment=None):
     options=types.HttpOptions(timeout=75000,retry_options=types.HttpRetryOptions(attempts=2,initial_delay=2,max_delay=6,http_status_codes=[429,503]))
     client=genai.Client(vertexai=True,project=os.environ['GOOGLE_CLOUD_PROJECT'],location=os.getenv('GOOGLE_CLOUD_LOCATION','global'),http_options=options) if vertex else genai.Client(api_key=os.environ['GEMINI_API_KEY'],http_options=options)
     text_model=os.environ['GEMINI_MODEL']
-    # Drawings go to the larger vision model first, falling back to the text model (both read sketches correctly once
-    # numeric bounds were removed from the schema; the preview Pro model has tighter quota). Text gets one retry.
+    # Drawings go to GEMINI_VISION_MODEL first (if set), then the text model. Text requests get one retry.
     attempts=[os.getenv('GEMINI_VISION_MODEL') or text_model,text_model] if attachment else [text_model,text_model]
     contents=[types.Part.from_bytes(data=attachment.raw(),mime_type=attachment.mime_type),payload] if attachment else payload
     config=types.GenerateContentConfig(temperature=0,
