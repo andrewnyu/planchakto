@@ -15,6 +15,7 @@ from .structure import CATALOG
 from .geometry import parse_survey,validate_site
 from .layout import generate_layouts
 from .ai import AIRequest,interpret,status
+from .example import example
 
 app=FastAPI(title='BuildGraph',version='0.1.0')
 logging.basicConfig(level=logging.INFO,format='%(levelname)s %(name)s: %(message)s')
@@ -45,13 +46,20 @@ class ImportRequest(Model):model:Building
 
 @app.get('/api/health')
 def health():return {'status':'ok','engine_version':ENGINE_VERSION,**status(),'storage':os.getenv('BUILDGRAPH_STORAGE','local'),'scope':'single-storey orthogonal prototype'}
+@app.get('/api/examples/plumbing')
+def plumbing_example():
+    model=example()
+    model.routing_mode='direct'
+    return {'model':model,'label':'Plumbing demo · direct routes'}
 @app.get('/api/project')
 def project():
-    state=store().state();s=store().get(state['head'])
-    s['results']['stale']=s['results']['input_hash']!=digest(s['model']) or s['results'].get('engine_version')!=ENGINE_VERSION
+    state=store().state();s=revision(state['head'])
     return {'state':state,'accepted':s,'revisions':store().list(),**status(),'sections':CATALOG}
 @app.get('/api/revisions/{id}')
-def revision(id:str):return store().get(id)
+def revision(id:str):
+    s=store().get(id)
+    s['results']['stale']=s['results']['input_hash']!=digest(s['model']) or s['results'].get('engine_version')!=ENGINE_VERSION
+    return s
 @app.post('/api/commands')
 def commands(req:CommandRequest):return store().preview(req)
 @app.post('/api/revisions/{id}/apply')

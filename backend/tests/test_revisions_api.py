@@ -61,6 +61,32 @@ def test_bad_survey_and_command_rejection(client):
     response=client.post('/api/commands',json={'base_revision':id,'command_id':'bad','commands':[{'type':'invent_a_result'}]})
     assert response.status_code==422
 
+def test_historical_revision_rechecks_engine_freshness(client,monkeypatch):
+    project=client.get('/api/project').json()
+    head=project['state']['head']
+    assert not client.get(f'/api/revisions/{head}').json()['results']['stale']
+    monkeypatch.setattr(main,'ENGINE_VERSION','next-engine-version')
+    assert client.get(f'/api/revisions/{head}').json()['results']['stale']
+    assert client.get('/api/project').json()['accepted']['results']['stale']
+
+def test_quick_review_sample_reroutes_without_overwriting_accepted(client):
+    project=client.get('/api/project').json()
+    sample=client.get('/api/examples/plumbing')
+    assert sample.status_code==200
+    model=sample.json()['model']
+    assert model['routing_mode']=='direct'
+    uploaded=client.post('/api/import/project',json={'model':model}).json()
+    plumbing=lambda r:[route for route in r['results']['routing']['routes'] if route['kind'] in ('water','drain')]
+    assert sum(route['status']=='fail' for route in plumbing(uploaded))==2
+    response=client.post('/api/commands',json={'base_revision':uploaded['id'],'command_id':'quick-review','commands':[{'type':'reroute','mode':'avoid'}],'label':'Clear routes'})
+    assert response.status_code==200
+    candidate=response.json()
+    assert all(route['status']=='pass' for route in plumbing(candidate))
+    assert client.get('/api/project').json()['state']['head']==project['state']['head']
+    difference=client.get(f"/api/compare?before={uploaded['id']}&after={candidate['id']}").json()
+    assert difference['cost_delta']>0
+    assert any(q['delta']>0 for q in difference['quantities'])
+
 @pytest.mark.parametrize('action,commands,revision,valid',[
  ('edit',[{'type':'set_equipment','equipment_id':'eq-ac','watts':2000}],'a',True),
  ('edit',[{'type':'set_parameter','field':'soil','value':75}],'a',True),

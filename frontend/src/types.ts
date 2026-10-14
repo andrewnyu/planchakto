@@ -27,4 +27,4 @@ export type Project={accepted:Revision;state:{head:string;history:string[];curso
 export type Diff={quantities:{id:string;name:string;unit:string;before:number;after:number;delta:number;cost_delta:number}[];cost_delta:number;geometry:{id:string;kind:string;before:unknown;after:unknown}[];before_total:number;after_total:number};
 export type Layer='architecture'|'structure'|'electrical'|'plumbing'|'furniture'|'solar'|'fire'|'terrain';
 export type Layers=Record<Layer,boolean>;
-export type Tab='design'|'engineering'|'quantities'|'revisions'|'site'|'checks';
+export type Tab='workflow'|'review'|'design'|'engineering'|'quantities'|'revisions'|'site'|'checks';

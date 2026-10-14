@@ -8,6 +8,8 @@ Built for small PH architecture and engineering teams iterating on a modest sing
 
 ## What it does
 
+- **See the full process.** The Planning graph is the default workspace. It connects site and brief inputs to layout, coordinated disciplines, quantities, and review/export. Progress comes from the current revision's inputs and computed screens; it never presents model preparation as professional approval.
+- **Review one system.** Upload a native BuildGraph project and go straight to plumbing, fire protection, electrical, structural, or solar findings. A PDF or image can be used as a layout reference through the configured AI provider, with a geometry-confirmation step before discipline review. The built-in plumbing sample gives the demo a reliable finding → fix → cost-impact loop.
 - **Edit the plan.** Move or swap rooms, move fixtures, furniture and equipment, change loads, remove columns, or edit the brief, grid and site. Edits work in a 2D scaled plan and a synchronized 3D model.
 - **See the impact before accepting.** Each edit creates a *candidate* revision. The accepted revision is never overwritten. You compare the two, then apply or discard.
 - **Run deterministic checks.** All of these are code, not AI:
@@ -57,6 +59,8 @@ npm run dev --prefix frontend   # http://127.0.0.1:5173
 
 To reset to the demo project, use the reset button in the app or `POST /api/reset`. Local state lives in `.data/buildgraph.sqlite3`.
 
+The shortest demo starts on the Planning graph: choose **Review an existing plan** → **Try a plumbing sample** → **Preview clear routes**. The candidate should change from two plumbing findings to none and show the modeled quantity-cost change before it is applied. See [docs/HACKATHON_DEMO.md](docs/HACKATHON_DEMO.md) for the full three-minute script and honest scope language.
+
 ## AI providers
 
 The assistant is server-side only; keys never reach the browser. Configure one or both providers in `.env`:
@@ -82,6 +86,10 @@ With no provider configured, the assistant says so explicitly. Every manual tool
 
 ```bash
 npm run build --prefix frontend   # tsc type-check + Vite build
+```
+
+```bash
+npm test --prefix frontend        # workflow status and discipline filtering
 ```
 
 ```bash
@@ -161,6 +169,10 @@ backend/
   store.py        SQLite revision store (cloud_store.py for GCP)
 frontend/src/
   App.tsx         workspace, tabs, inspector, assistant
+  Workflow.tsx    interactive planning-process graph
+  planning.ts     derived progress and discipline check filters
+  DisciplineReview.tsx focused review, plan context and quick fixes
+  ReviewUpload.tsx native-project and drawing-reference entry
   Plan.tsx        2D SVG plan
   Model3D.tsx     Three.js model (lazy-loaded)
   Solar.tsx       solar PV results and inputs (Engineering tab)

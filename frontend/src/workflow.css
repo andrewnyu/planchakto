@@ -1,0 +1,113 @@
+.focused-workspace .workspace > .explorer,
+.focused-workspace .workspace > .inspector,
+.focused-workspace .mobile-toggle {display:none}
+.workflow-page, .discipline-page {padding:30px 38px 24px; background:#f8faf6}
+.workflow-intro {display:flex;justify-content:space-between;align-items:center;gap:28px;margin-bottom:24px}
+.eyebrow {font-size:10px;font-weight:650;letter-spacing:.12em;color:#627666}
+.workflow-intro h2 {font-size:29px;line-height:1.2;margin:9px 0 10px;letter-spacing:-.05em}
+.workflow-intro p {font-size:13px;color:#657567}
+.workflow-intro > .button {flex-shrink:0}
+.workflow-progress {display:flex;align-items:center;gap:24px;padding:17px 0;border-block:1px solid #dfe6da}
+.workflow-progress > div:first-child {display:flex;align-items:center;gap:12px;flex-shrink:0}
+.workflow-progress strong {font-size:13px;font-weight:600}
+.workflow-progress small {display:block;margin-top:4px;font-size:11px;color:#68776b}
+.progress-segments {display:flex;gap:4px;flex:1;max-width:300px}
+.progress-segments span {height:5px;flex:1;background:#d9dfd5;border-radius:1px}
+.progress-segments .ready {background:#598370}
+.progress-segments .attention, .progress-segments .missing {background:#c59568}
+.workflow-progress > button {margin-left:auto;text-align:left}
+.planning-graph {position:relative;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:40px;padding:26px 0 18px}
+.graph-connectors {position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}
+.graph-connectors > path {fill:none;stroke:#b7c4b9;stroke-width:1.25}
+.graph-column {min-width:0;position:relative;pointer-events:none}
+.graph-column h3 {display:flex;align-items:center;gap:8px;font-size:10px;letter-spacing:.01em;font-weight:500;color:#647565;margin-bottom:20px;min-height:20px}
+.graph-column h3 > span {font-family:'Geist Mono',monospace;font-size:9px;color:#6f7d6c}
+.graph-nodes {display:flex;flex-direction:column;gap:12px}
+.graph-column-0 .graph-nodes, .graph-column-1 .graph-nodes, .graph-column-3 .graph-nodes {padding-top:106px}
+.graph-node {width:100%;display:flex;align-items:flex-start;flex-direction:column;gap:9px;padding:14px;text-align:left;background:#fff;border:1px solid #d6dfd1;border-radius:7px;min-height:94px;pointer-events:auto}
+.graph-node:hover {border-color:#7b9882;background:#f1f5ec;box-shadow:0 3px 12px #304d3610}
+.graph-node.attention, .graph-node.missing {border-color:#d7bba1}
+.graph-node.idle, .graph-node.optional {border-style:dashed;background:#f7f9f3}
+.graph-node-title {display:flex;align-items:center;gap:8px;width:100%}
+.graph-node-title > strong {font-size:12px;font-weight:600;letter-spacing:-.01em}
+.graph-node-title > svg:first-child {flex-shrink:0;color:#5f7966}
+.graph-node-title > svg:last-child {margin-left:auto;color:#647665;flex-shrink:0}
+.graph-node-detail {font-size:10px;line-height:1.5;color:#627263}
+.stage-state {display:flex;align-items:center;gap:5px;font-size:10px;line-height:1.3;color:#5f6a60}
+.stage-state.ready {color:#366749}
+.stage-state.attention, .stage-state.missing {color:#92602f}
+.stage-state.stale {color:#994d3c}
+.graph-action {margin:17px 0 0;pointer-events:auto;font-size:11px;text-align:left}
+.workflow-bottom {border-top:1px solid #dfe6da;padding-top:18px}
+.quick-review {display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.quick-review > span {font-size:12px;color:#647465;margin-right:8px}
+.quick-review button {padding:9px 13px;border:1px solid #d8e1d3;border-radius:5px;background:#fff;font-size:11px}
+.quick-review button:hover {background:#eaf0e4}
+.workflow-bottom > p {font-size:10px;color:#6f7b6e;margin-top:14px}
+.back-to-graph {margin-bottom:20px}
+.discipline-page > .page-heading {margin-bottom:22px}
+.discipline-tabs {display:flex;gap:7px;flex-wrap:wrap;margin-bottom:22px}
+.discipline-tabs button {padding:10px 17px;border:1px solid #d9e0d3;border-radius:5px;font-size:12px;background:#fff}
+.discipline-tabs button.active {background:#355b49;border-color:#355b49;color:#fff}
+.review-scope {display:flex;align-items:baseline;gap:20px;padding-bottom:22px;margin-bottom:24px;border-bottom:1px solid #dfe6da}
+.review-scope > strong {font-size:15px;white-space:nowrap}
+.review-scope p {font-size:12px;color:#627262;max-width:760px}
+.review-grid {display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:32px}
+.review-counts {display:flex;gap:25px;margin-bottom:24px}
+.review-counts > div {display:flex;flex-direction:column;gap:5px}
+.review-counts strong {font-size:26px;font-weight:500;letter-spacing:-.04em;font-variant-numeric:tabular-nums}
+.review-counts span {font-size:10px;color:#657563}
+.priority-findings > h3 {margin-bottom:12px}
+.review-finding {padding:17px 0;border-bottom:1px solid #e1e6dc}
+.review-finding:first-of-type {border-top:1px solid #e1e6dc}
+.review-finding-top {display:flex;align-items:center;gap:12px;margin-bottom:9px}
+.review-finding-top .mono {font-size:10px;color:#677766}
+.review-finding > p {font-size:12px;overflow-wrap:anywhere}
+.review-finding-actions {display:flex;align-items:baseline;gap:22px;margin-top:13px}
+.review-finding-actions details {font-size:10px;color:#637664;flex:1;min-width:0}
+.review-finding-actions details pre {max-height:250px;overflow:auto}
+.review-finding-actions .text-button {font-size:11px}
+.review-clear {display:flex;gap:12px;padding:19px;background:#edf3e8;border:1px solid #dce6d6;border-radius:5px;margin-bottom:24px}
+.review-clear svg {flex-shrink:0;color:#477858}
+.review-clear strong {font-size:13px}
+.review-clear p {font-size:11px;color:#657761;margin-top:5px}
+.review-actions {display:flex;gap:10px;flex-wrap:wrap;margin:20px 0}
+.review-actions > p {flex-basis:100%;font-size:11px;color:#657563}
+.review-details {margin-top:25px;padding-top:18px;border-top:1px solid #dfe6da}
+.review-details > summary {font-size:12px;font-weight:600}
+.review-system-inputs {margin-top:24px;min-width:0}
+.review-system-inputs .scope-note {flex-wrap:wrap}
+.review-system-inputs .solar-stats {grid-template-columns:repeat(2,minmax(0,1fr))}
+.review-context {min-width:0}
+.review-plan {height:245px;border:1px solid #dce4d6;border-radius:6px;overflow:hidden;display:flex}
+.review-plan .plan-wrap {width:100%;min-width:0;min-height:0}
+.review-plan .canvas-tools,.review-plan .canvas-corner,.review-plan .canvas-hint,.review-plan .north {display:none}
+.review-context > .text-button {margin:13px 0 24px;font-size:11px}
+.review-impact {display:flex;flex-direction:column;align-items:flex-start;padding:20px 0;border-block:1px solid #dfe6da;gap:9px}
+.review-impact > span {font-size:11px;color:#637560}
+.review-impact > strong {font-size:27px;font-weight:500;letter-spacing:-.04em}
+.review-impact p,.review-impact small {font-size:11px;color:#627561}
+.review-impact button {margin-top:7px;font-size:11px}
+.review-route-list {margin-top:23px}
+.review-route-list h3 {margin-bottom:8px}
+.review-route-list > button {display:flex;justify-content:space-between;width:100%;text-align:left;padding:13px 0;border-bottom:1px solid #e0e6da}
+.review-route-list > button:hover {background:#edf3e8}
+.review-route-list strong {font-size:11px;font-weight:500;display:block}
+.review-route-list small {display:block;font-size:10px;color:#687663;margin-top:5px}
+.review-upload .file-drop {margin:18px 0}
+.upload-explainer {display:flex;gap:10px;align-items:flex-start;margin:15px 0}
+.upload-explainer svg {flex-shrink:0;margin-top:3px;color:#697c67}
+.upload-explainer p {font-size:12px}
+.review-upload > .button {margin-top:14px}
+.upload-alternatives {display:flex;gap:14px;justify-content:space-between;padding-top:22px;margin-top:20px;border-top:1px solid #dfe6da;flex-wrap:wrap}
+.upload-alternatives + .helper {margin-top:15px}
+.reference-note {padding:14px 16px;background:#f0f3e9;border-left:3px solid #a1b18f;font-size:12px;line-height:1.6;margin-block:15px}
+.drawing-review-banner {display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px 20px;background:#eef3e6;border-bottom:1px solid #d8e4ce;font-size:11px}
+.drawing-review-banner strong {display:block;font-size:12px;margin-bottom:4px}
+.fire-start {display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-top:16px}
+.fire-start .field {flex:1;min-width:200px;margin:0}
+.fire-start .button {margin-bottom:0}
+@media(min-width:1600px){.workflow-page,.discipline-page{padding-inline:55px}.planning-graph{gap:60px}.graph-node{padding:17px}.graph-node-title>strong{font-size:14px}.graph-node-detail,.stage-state{font-size:11px}.review-grid{grid-template-columns:minmax(0,1fr) 370px}}
+@media(max-width:1120px){.workflow-page,.discipline-page{padding:24px}.planning-graph{gap:26px}.workflow-intro h2{font-size:25px}.graph-node{padding:12px}.graph-node-title{gap:5px}.graph-node-title>svg:last-child{display:none}.review-grid{grid-template-columns:minmax(0,1fr) 270px;gap:24px}.progress-segments{max-width:170px}.review-counts{gap:16px}}
+@media(max-width:860px){.workflow-intro{align-items:flex-start;flex-direction:column;gap:17px}.workflow-progress{flex-wrap:wrap;gap:15px}.workflow-progress>button{margin-left:0}.progress-segments{max-width:none;min-width:90px}.planning-graph{grid-template-columns:repeat(2,minmax(0,1fr));gap:25px}.graph-connectors{display:none}.graph-column .graph-nodes{padding-top:0}.graph-column h3{margin-bottom:12px}.graph-column-2{grid-column:1/-1}.graph-column-2 .graph-nodes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.graph-column-3{grid-column:1/-1}.graph-column-3 .graph-nodes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.review-grid{grid-template-columns:1fr}.review-context{display:grid;grid-template-columns:1fr 1fr;gap:15px}.review-plan{grid-column:1}.review-context>.text-button{grid-column:1;grid-row:2;margin:0}.review-impact{grid-column:2;grid-row:1}.review-route-list{grid-column:1/-1}.review-scope{display:block}.review-scope p{margin-top:9px}.discipline-page>.page-heading{flex-wrap:wrap;gap:15px}}
+@media(max-width:520px){.workflow-page,.discipline-page{padding:22px 16px}.workflow-intro h2{font-size:25px}.workflow-intro p{font-size:12px}.workflow-progress>div:first-child{flex-shrink:1}.workflow-progress small{font-size:10px}.progress-segments{flex-basis:100%;order:3}.planning-graph{grid-template-columns:1fr;gap:24px}.graph-column-2,.graph-column-3{grid-column:auto}.graph-column-2 .graph-nodes,.graph-column-3 .graph-nodes{display:flex}.graph-node{min-height:92px}.graph-node-title>strong{font-size:13px}.graph-node-detail,.stage-state{font-size:11px}.graph-node-title>svg:last-child{display:block}.workflow-bottom>p{font-size:11px}.quick-review{align-items:stretch;gap:8px}.quick-review>span{flex-basis:100%}.quick-review button{padding:10px;font-size:11px}.focused-workspace .workspace-tabs{overflow-x:auto;gap:12px}.focused-workspace .tabs{gap:17px;flex-shrink:0}.focused-workspace .history-tools{display:none}.review-counts{display:grid;grid-template-columns:1fr 1fr;gap:17px}.review-counts span{font-size:11px}.review-context{display:block}.review-context>.text-button{margin:14px 0}.review-plan{height:235px}.discipline-tabs{gap:6px}.discipline-tabs button{padding:10px 12px;font-size:11px}.review-finding-actions{gap:12px;flex-wrap:wrap}.review-finding-actions details{flex-basis:100%}.review-system-inputs .solar-stats{grid-template-columns:1fr}.drawing-review-banner{flex-wrap:wrap}.upload-alternatives{flex-direction:column;align-items:flex-start}}

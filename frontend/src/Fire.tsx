@@ -13,7 +13,8 @@ export function FireSection({model:b,result:r,busy,onPropose}:{model:Building;re
  const set=(fire:FireProtection,label:string)=>onPropose([{type:'set_fire',fire}],label);
  const f=r.fire;
  if(!b.fire?.enabled||!f?.enabled)return <><div className="section-head"><h3>Fire protection</h3><span>Optional · RA 9514</span></div>
-  <div className="scope-note"><Flame size={17}/><div><strong>Not screened</strong><p>Check egress, exits, travel distance, alarms, signs and extinguishers for a business or mercantile occupancy against the 2019 RIRR of the Fire Code.</p></div><button className="button secondary" disabled={busy} onClick={()=>set({...(b.fire??defaults),enabled:true},'Screen fire protection')}>Screen fire protection <ArrowRight size={13}/></button></div></>;
+  <div className="scope-note"><Flame size={17}/><div><strong>Not screened</strong><p>Check egress, exits, travel distance, alarms, signs and extinguishers for a business or mercantile occupancy against the 2019 RIRR of the Fire Code. Residential occupancy is outside this screen.</p></div></div>
+  <div className="fire-start"><Field label="Occupancy to screen"><select value={draft.occupancy} disabled={busy} onChange={e=>setDraft({...draft,occupancy:e.target.value as FireProtection['occupancy']})}>{occupancies.map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></Field><button className="button secondary" disabled={busy} onClick={()=>set({...draft,enabled:true},'Screen fire protection')}>Screen fire protection <ArrowRight size={13}/></button></div></>;
  const changed=JSON.stringify(draft)!==JSON.stringify(b.fire);
  const up=(patch:Partial<FireProtection>)=>setDraft({...draft,...patch});
  const upExit=(i:number,patch:Partial<ExitDoor>)=>up({exits:draft.exits.map((e,k)=>k===i?{...e,...patch}:e)});
