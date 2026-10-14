@@ -5,12 +5,13 @@ from .structure import CATALOG
 def takeoff(b,structure,routing,solar=None):
     walls=wall_geometry(b);doors=openings(b);e=b.engineering
     def route_items(kind):return [r for r in routing['routes'] if r['kind']==kind]
-    steel=sum(x['length'] for x in structure['beams'])*CATALOG[e.section]['kg_m']
+    members=structure['beams']+structure.get('girders',[])
+    steel=sum(x['length'] for x in members)*CATALOG[e.section]['kg_m']
     data={
       'slab':(b.width*b.depth*.1,[b.slab_id],'width × depth × 0.10 m assumed slab thickness'),
       'roof':(b.width*b.depth,[b.roof_id],'width × depth; flat projected roof, no overhang'),
-      'steel':(steel,[x['id'] for x in structure['beams']],'Σ beam lengths × theoretical RHS kg/m; sharp-corner section assumption'),
-      'columns':(sum(c.active for c in b.columns)*b.height,[c.id for c in b.columns if c.active],'active column count × storey height; section adequacy not evaluated'),
+      'steel':(steel,[x['id'] for x in members],'Σ roof beam and grid girder lengths × theoretical RHS kg/m; sharp-corner section assumption'),
+      'columns':(sum(c.active for c in b.columns)*b.height,[c.id for c in b.columns if c.active],f'active column count × storey height; {e.column_section} section, checked in the seismic frame analysis' if e.lateral.enabled else 'active column count × storey height; section adequacy not evaluated'),
       'foundations':(sum(c.active for c in b.columns)*e.footing_width**2*e.footing_thickness,[f'foundation-{c.id}' for c in b.columns if c.active],'count × width² × thickness; preliminary pads'),
       'walls':(max(0,sum(w['length'] for w in walls)*b.height*2-sum(d['width']*d['height'] for d in doors)*2),[w['id'] for w in walls]+[d['id'] for d in doors],'unique wall centerline length × height × 2 faces − modeled door areas × 2; no window deductions (windows not modeled)'),
       'floor':(sum(r.w*r.h for r in b.rooms),[r.id for r in b.rooms],'Σ room rectangles including circulation'),

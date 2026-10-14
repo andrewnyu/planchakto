@@ -2,16 +2,17 @@
 from .domain import digest
 from .solar import SOURCES as SOLAR_SOURCES
 from .fire import SOURCE as FIRE_SOURCE
+from .lateral import SOURCE as LATERAL_SOURCE
 
 SOURCES={
  'beam':'Euler–Bernoulli beam theory; stiffness implementation and closed-form validation in docs/ENGINEERING.md. Not a code clause.',
  'project':'User-entered demonstration criterion; source supplied with project. Not a statutory requirement.',
  'geometry':'Euclidean geometry; implemented predicates in backend/geometry.py and backend/routing.py.',
  'code':'Authoritative Philippine code text and project applicability not supplied; no code clauses asserted.',
- 'pv-ocpd':SOLAR_SOURCES['ocpd'],'pv-busbar':SOLAR_SOURCES['busbar'],'pv-net':SOLAR_SOURCES['netmeter'],'pv-host':SOLAR_SOURCES['hosting'],'pv-xfmr':SOLAR_SOURCES['transformer'],'fire':FIRE_SOURCE}
+ 'pv-ocpd':SOLAR_SOURCES['ocpd'],'pv-busbar':SOLAR_SOURCES['busbar'],'pv-net':SOLAR_SOURCES['netmeter'],'pv-host':SOLAR_SOURCES['hosting'],'pv-xfmr':SOLAR_SOURCES['transformer'],'fire':FIRE_SOURCE,'seismic':LATERAL_SOURCE}
 
 def make_rule(id,name,source,required,formula,units,scope):
-    return {'id':id,'version':'1.0.0','name':name,'source':SOURCES[source],'edition':'BuildGraph 0.1 / 2026-10-13','reference':formula,'jurisdiction':'Cited PH source — verify against the current official edition' if source.startswith('pv-') or source=='fire' else 'Project-specific illustrative criterion; not verified PH regulation','applicability':scope,'required_inputs':required,'formula':formula,'units':units,'tolerance':1e-6,'review_status':'Numerically benchmarked' if source=='beam' else 'Prototype / professional review required','exclusions':'Whole-building compliance, stability and construction certification'}
+    return {'id':id,'version':'1.0.0','name':name,'source':SOURCES[source],'edition':'BuildGraph 0.1 / 2026-10-13','reference':formula,'jurisdiction':'Cited PH source — verify against the current official edition' if source.startswith('pv-') or source in ('fire','seismic') else 'Project-specific illustrative criterion; not verified PH regulation','applicability':scope,'required_inputs':required,'formula':formula,'units':units,'tolerance':1e-6,'review_status':'Numerically benchmarked' if source=='beam' else 'Prototype / professional review required','exclusions':'Whole-building compliance, stability and construction certification'}
 
 RULES=[
  make_rule('LAYOUT','Room geometry & access','geometry',['room rectangles','door graph','boundary','setback'],'containment ∧ disjoint interiors ∧ area ranges ∧ door access','m, m²','Rectangular rooms and fixed corridor'),
@@ -43,10 +44,16 @@ RULES=[
  make_rule('FIRE-SIGNS','Exit signs','fire',['exit signs'],'provided','—','All business and mercantile'),
  make_rule('FIRE-EXT','Portable extinguishers','fire',['extinguisher positions & ratings','hazard'],'count ≥ area / max area; door-constrained travel ≤ Table 7 limit; rating ≥ minimum','m, m²','Class A hazards'),
  make_rule('FIRE-SCOPE','Fire protection coverage','fire',[],'not evaluated','n/a','Outside the supported screen'),
+ make_rule('SEISMIC-V','Seismic design base shear','seismic',['zone','soil profile','Na, Nv','R','I','seismic weight','height'],'V = Cv·I·W/(R·T), ≤ 2.5·Ca·I·W/R, ≥ 0.11·Ca·I·W and (zone 4) ≥ 0.8·Z·Nv·I·W/R; T = Ct·hn^¾','kN','Single-storey regular frame; static force procedure'),
+ make_rule('DRIFT','Storey drift','seismic',['frame stiffness','base shear','R','storey height'],'ΔM = 0.7·R·ΔS ≤ 0.025·h (T < 0.7 s) or 0.020·h','mm','Rigid diaphragm; torsion excluded'),
+ make_rule('COLUMN','Steel column strength','seismic',['column section','K','Fy, E','LRFD combinations'],'Pr/Pc + 8/9·Mr/Mc ≤ 1 (Pr/Pc ≥ 0.2) else Pr/(2Pc) + Mr/Mc ≤ 1; Fcr per AISC E3','—','Compact square HSS, first-order analysis'),
+ make_rule('FRAME-MEMBER','Frame beam and girder flexure','seismic',['section','seismic combinations'],'M_max ≤ 0.9·Fy·Zp','kN·m','Plastic flexure; lateral-torsional buckling excluded'),
+ make_rule('FOOT-LATERAL','Footing under seismic load','seismic',['base reactions','pad size','allowable bearing','friction coefficient'],'e = M/P; q_max = P/B²(1 + 6e/B) or 2P/(3B(B/2 − e)) ≤ allowable; μP/H ≥ sliding FS','kPa','Square pad, uniaxial, no one-third increase'),
+ make_rule('WIND','Wind loads','code',[],'not evaluated','n/a','NSCP 2015 §207 not implemented'),
  make_rule('PH-CODE','Philippine code coverage','code',[],'not evaluated','n/a','Code edition and authoritative rule library unavailable'),
 ]
 
-def evaluate_rules(b,structure,layout,routing,fitout,rev,solar=None,fire=None):
+def evaluate_rules(b,structure,layout,routing,fitout,rev,solar=None,fire=None,lateral=None):
     results=[]
     def add(rule,status,objects,evidence,inputs=None):
         results.append({'id':f'{rule}-{len(results)}','rule_id':rule,'rule_version':'1.0.0','revision_id':rev,'status':status,'objects':objects,'evidence':evidence,'inputs':inputs or {},'explanation':evidence})
@@ -66,7 +73,11 @@ def evaluate_rules(b,structure,layout,routing,fitout,rev,solar=None,fire=None):
         for c in solar['checks']:add(c['rule'],c['status'],[m['id'] for m in solar['layout']['modules']] or ['solar-array'],c['evidence'],c['inputs'])
     if fire and fire['enabled']:
         for c in fire['checks']:add(c['rule'],c['status'],[b.id],f"{c['evidence']} [{c['clause']}]",c['inputs'])
+    if lateral and lateral.get('enabled'):
+        for c in lateral['checks']:add(c['rule'],c['status'],c['objects'],f"{c['evidence']} [{c['clause']}]" if c['clause'] else c['evidence'],c['inputs'])
     add('PH-CODE','unsupported',[b.id],'No Philippine statutory rules are verified. This is preliminary planning and review support, requiring appropriate professional review for construction and approval.')
-    for name in ['Whole-building stability, wind and seismic','Steel column buckling and connections','Foundation uplift, eccentric contact, settlement, sliding, overturning, punching and reinforcement','Electrical protection, conductor sizing and voltage drop','Plumbing hydraulic sizing, venting and pipe diameter adequacy']:
+    gaps=(['Torsion, orthogonal effects, P-Δ, irregular and multi-storey buildings, dynamic analysis','Connections, base plates and anchor bolts','Foundation settlement, punching shear and reinforcement'] if lateral and lateral.get('enabled') else
+          ['Whole-building stability, wind and seismic','Steel column buckling and connections','Foundation uplift, eccentric contact, settlement, sliding, overturning, punching and reinforcement'])
+    for name in gaps+['Electrical protection, conductor sizing and voltage drop','Plumbing hydraulic sizing, venting and pipe diameter adequacy']:
         add('PH-CODE','unsupported',[b.id],f'{name}: not evaluated by the supported analytical family.')
     return results

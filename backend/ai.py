@@ -41,7 +41,7 @@ PROVIDERS={'gemini':('GEMINI_API_KEY','GEMINI_MODEL'),'vertex':('GOOGLE_CLOUD_PR
 OPENROUTER_URL='https://openrouter.ai/api/v1/chat/completions'
 
 # Edits that need the explicit manual editor; the assistant can never issue them.
-RESTRICTED={'set_lock','set_site','set_grid','set_brief','set_rate','set_solar','set_fire'}
+RESTRICTED={'set_lock','set_site','set_grid','set_brief','set_rate','set_solar','set_fire','set_lateral'}
 
 @functools.cache
 def gemini_schema():
@@ -90,7 +90,7 @@ def validate_plan(plan:AIPlan,request:AIRequest):
     if plan.revision_id!=request.revision_id:raise ValueError('The assistant targeted an outdated or different revision')
     if plan.action=='edit' and not plan.commands:raise ValueError('No typed edits returned')
     if plan.action!='edit' and plan.commands:raise ValueError('Read-only action cannot contain edits')
-    if any(c.type in RESTRICTED for c in plan.commands):raise ValueError('This operation requires the explicit manual editor; the assistant cannot change locks, site data, grid, brief, rates, solar/utility or fire protection inputs')
+    if any(c.type in RESTRICTED for c in plan.commands):raise ValueError('This operation requires the explicit manual editor; the assistant cannot change locks, site data, grid, brief, rates, solar/utility, fire protection or seismic inputs')
     return plan
 
 def _gemini(payload,vertex=False,attachment=None):

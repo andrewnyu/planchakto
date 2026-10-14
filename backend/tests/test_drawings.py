@@ -37,7 +37,7 @@ def test_dxf_layers_units_and_flipped_y():
     used={e.dxf.layer for e in doc.modelspace()}
     assert {'A-WALL','S-BEAM','S-FNDN','E-POWR','E-PV','P-SANR','FP-EGRS'}<=used
     beams=[e for e in doc.modelspace() if e.dxf.layer=='S-BEAM']
-    assert len(beams)==len(r['structure']['beams']) and all(e.dxf.start.y<=0 for e in beams)   # plan y-down → CAD y-up
+    assert len(beams)==len(r['structure']['beams'])+len(r['structure']['girders']) and all(e.dxf.start.y<=0 for e in beams)   # roof beams + grid girders; plan y-down → CAD y-up
 
 def test_permit_endpoints(tmp_path,monkeypatch):
     monkeypatch.setattr(main,'_store',LocalStore(str(tmp_path/'t.sqlite3')));client=TestClient(main.app)

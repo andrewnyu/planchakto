@@ -6,6 +6,7 @@ import {Plan} from './Plan';
 import {Status} from './ui';
 import {FireSection} from './Fire';
 import {SolarSection} from './Solar';
+import {SeismicSection} from './Seismic';
 
 export function DisciplineReview({revision, discipline, diff, comparisonLabel, busy, onDiscipline, onUpload, onLocate, onPropose, onEngineering, onOverview, onQuantities}: {
   revision: Revision; discipline: Discipline; diff: Diff | null; comparisonLabel: string; busy: boolean;
@@ -37,7 +38,7 @@ export function DisciplineReview({revision, discipline, diff, comparisonLabel, b
       {r.stale ? <p className="reference-note">Recompute this revision using the banner above to refresh these findings.</p> : problems.length ? <div className="priority-findings"><h3>Start with these findings</h3>{problems.map(evidence)}</div> : checks.length ? <div className="review-clear"><CheckCircle2 size={20}/><div><strong>No findings in the evaluated screens</strong><p>Coverage limits remain listed above and in the detailed results.</p></div></div> : <p className="reference-note">This system has not been assessed. {discipline === 'fire' || discipline === 'solar' ? 'Set up the screen below to begin.' : 'Add the relevant model elements and inputs to begin.'}</p>}
       {['plumbing', 'electrical'].includes(discipline) && <div className="review-actions"><button className="button primary" disabled={busy || r.stale || !routes.length} onClick={() => onPropose([{type: 'reroute', mode: 'avoid'}], 'Preview clear service routes')}><RefreshCw size={14}/> Preview clear routes</button><button className="button secondary" onClick={() => onLocate(discipline === 'plumbing' ? b.fixtures[0]?.id : b.equipment[0]?.id)}><Settings2 size={14}/> Edit {discipline === 'plumbing' ? 'fixtures' : 'equipment'}</button><p>Recalculates water, drainage and conduit together. Compare the result before applying.</p></div>}
       {discipline === 'structure' && <button className="button primary" onClick={onEngineering}><Settings2 size={15}/> Edit loads & supports</button>}
-      {(discipline === 'fire' || discipline === 'solar') && <div className="review-system-inputs">{discipline === 'fire' ? <FireSection key={revision.id} model={b} result={r} busy={busy} onPropose={onPropose}/> : <SolarSection key={revision.id} model={b} result={r} busy={busy} onPropose={onPropose}/>}</div>}
+      {(discipline === 'fire' || discipline === 'solar' || discipline === 'structure') && <div className="review-system-inputs">{discipline === 'fire' ? <FireSection key={revision.id} model={b} result={r} busy={busy} onPropose={onPropose}/> : discipline === 'solar' ? <SolarSection key={revision.id} model={b} result={r} busy={busy} onPropose={onPropose}/> : <SeismicSection key={revision.id} model={b} result={r} busy={busy} onPropose={onPropose}/>}</div>}
       {!!other.length && !['fire', 'solar'].includes(discipline) && <details className="review-details"><summary>Passing screens & coverage ({other.length})</summary>{other.map(evidence)}</details>}
     </div><aside className="review-context">
       <div className="review-plan"><Plan model={b} result={r} layers={layers} selected="" onSelect={onLocate} onMove={() => {}} accepted={b} compare={false} readOnly/></div>

@@ -113,7 +113,8 @@ def test_quantity_hand_calculations_and_reconciliation():
     assert q['floor']['net']==108
     assert q['columns']['net']==36
     assert q['columns']['purchased']==42
-    assert q['steel']['net']==pytest.approx(36*CATALOG['RHS200']['kg_m'])
+    # Roof beams 3 rows × 12 m + Y-direction grid girders 4 lines × 9 m.
+    assert q['steel']['net']==pytest.approx((36+36)*CATALOG['RHS200']['kg_m'])
     # Unique wall length: exterior 42 + corridor 24 + partitions 8 + 7 = 81 m.
     # Door deductions: six 0.9 × 2.1 + one 1.2 × 2.1, both faces.
     assert q['walls']['net']==pytest.approx(81*3*2-(6*.9+1.2)*2.1*2)

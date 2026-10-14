@@ -9,7 +9,7 @@ export const disciplines: {id: Discipline; label: string; scope: string}[] = [
   {id: 'plumbing', label: 'Plumbing', scope: 'Water routes, clashes and gravity drain fall. Pipe sizing, hydraulics and venting are not evaluated.'},
   {id: 'fire', label: 'Fire protection', scope: 'Single-storey business and mercantile screening. Confirm occupancy before using the results; residential fire review is outside this screen.'},
   {id: 'electrical', label: 'Electrical', scope: 'Equipment loads, circuit arithmetic and conduit paths. Protection, cable sizing and voltage drop are not evaluated.'},
-  {id: 'structure', label: 'Structure', scope: 'Independent roof beams and centered bearing. Whole-building stability, wind, seismic and connections are not evaluated.'},
+  {id: 'structure', label: 'Structure', scope: 'Roof beams, seismic base shear, moment-frame drift, steel columns and footings under seismic load. Wind, torsion, P-Δ and connections are not evaluated.'},
   {id: 'solar', label: 'Solar PV', scope: 'Array fit, added roof load and selected electrical screens. Wind uplift, attachments and utility approval remain outside this review.'},
 ];
 

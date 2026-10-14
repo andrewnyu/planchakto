@@ -8,9 +8,9 @@
       "greedy": {
         "timing": {
           "runs": 7,
-          "median_ms": 4.234,
-          "min_ms": 3.92,
-          "max_ms": 5.066
+          "median_ms": 3.855,
+          "min_ms": 3.831,
+          "max_ms": 4.59
         },
         "feasible": true,
         "issues": [],
@@ -19,9 +19,9 @@
       "cp_sat": {
         "timing": {
           "runs": 3,
-          "median_ms": 22.018,
-          "min_ms": 21.766,
-          "max_ms": 23.894
+          "median_ms": 20.976,
+          "min_ms": 20.645,
+          "max_ms": 23.204
         },
         "candidate_count": 2,
         "statuses": [
@@ -37,9 +37,9 @@
         "direct": {
           "timing": {
             "runs": 7,
-            "median_ms": 0.447,
-            "min_ms": 0.438,
-            "max_ms": 0.593
+            "median_ms": 0.459,
+            "min_ms": 0.45,
+            "max_ms": 0.566
           },
           "route_count": 10,
           "failed_routes": 3,
@@ -49,9 +49,9 @@
         "avoid": {
           "timing": {
             "runs": 7,
-            "median_ms": 10.009,
-            "min_ms": 9.589,
-            "max_ms": 10.177
+            "median_ms": 10.266,
+            "min_ms": 10.092,
+            "max_ms": 10.48
           },
           "route_count": 10,
           "failed_routes": 1,
@@ -61,26 +61,26 @@
       },
       "complete_compute": {
         "runs": 7,
-        "median_ms": 17.856,
-        "min_ms": 17.589,
-        "max_ms": 18.67
+        "median_ms": 29.055,
+        "min_ms": 28.795,
+        "max_ms": 30.853
       },
       "checks": {
-        "pass": 44,
+        "pass": 88,
         "fail": 1,
         "missing_input": 0,
-        "unsupported": 6,
+        "unsupported": 7,
         "not_applicable": 0
       },
-      "estimate_PHP": 613776.83
+      "estimate_PHP": 711199.23
     },
     "swapped_wet_rooms": {
       "greedy": {
         "timing": {
           "runs": 7,
-          "median_ms": 3.883,
-          "min_ms": 3.854,
-          "max_ms": 4.245
+          "median_ms": 3.827,
+          "min_ms": 3.785,
+          "max_ms": 3.952
         },
         "feasible": true,
         "issues": [],
@@ -89,9 +89,9 @@
       "cp_sat": {
         "timing": {
           "runs": 3,
-          "median_ms": 28.627,
-          "min_ms": 25.538,
-          "max_ms": 31.122
+          "median_ms": 24.172,
+          "min_ms": 24.027,
+          "max_ms": 24.445
         },
         "candidate_count": 3,
         "statuses": [
@@ -109,9 +109,9 @@
         "direct": {
           "timing": {
             "runs": 7,
-            "median_ms": 0.502,
-            "min_ms": 0.436,
-            "max_ms": 0.669
+            "median_ms": 0.465,
+            "min_ms": 0.453,
+            "max_ms": 0.518
           },
           "route_count": 10,
           "failed_routes": 4,
@@ -121,9 +121,9 @@
         "avoid": {
           "timing": {
             "runs": 7,
-            "median_ms": 15.502,
-            "min_ms": 14.918,
-            "max_ms": 16.506
+            "median_ms": 15.714,
+            "min_ms": 15.458,
+            "max_ms": 15.966
           },
           "route_count": 10,
           "failed_routes": 2,
@@ -133,18 +133,18 @@
       },
       "complete_compute": {
         "runs": 7,
-        "median_ms": 24.995,
-        "min_ms": 24.466,
-        "max_ms": 26.445
+        "median_ms": 34.703,
+        "min_ms": 34.421,
+        "max_ms": 34.899
       },
       "checks": {
-        "pass": 43,
+        "pass": 87,
         "fail": 2,
         "missing_input": 0,
-        "unsupported": 6,
+        "unsupported": 7,
         "not_applicable": 0
       },
-      "estimate_PHP": 614046.83
+      "estimate_PHP": 711469.23
     }
   },
   "beam_benchmark": {

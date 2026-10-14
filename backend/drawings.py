@@ -45,6 +45,18 @@ class View:
     def circle(self,layer,c,r,w=.25,fill=None,dash=False,under=False):self._add(('circle',layer,tuple(c),r,w,fill,dash),under)
     def text(self,layer,p,s,h=2.5,align='center',bold=False,under=False):self._add(('text',layer,tuple(p),str(s),h,align,bold),under)
 
+
+def seismic_notes(b,lat):
+    """S-1 notes for the seismic frame screen; states plainly what is and is not covered."""
+    if not lat.get('enabled'):return ['Wind, seismic, frame stability, connections and column buckling are NOT designed.']
+    l=b.engineering.lateral
+    if 'base_shear' not in lat:return [f"Seismic: zone {l.zone}, soil {l.soil_profile}. Base shear NOT computed: {'; '.join(lat.get('missing') or [x['evidence'] for x in lat.get('checks',[]) if x['rule']=='SEISMIC-V'])}.",'Wind, connections and base plates are NOT designed.']
+    v,c=lat['base_shear'],lat['coefficients'];d=lat['directions']
+    return [f"Seismic (NSCP 2015 §208 static force procedure, verify): zone {l.zone} (Z = {c['Z']}), soil {l.soil_profile}, Ca = {c['Ca']:.2f}, Cv = {c['Cv']:.2f}, Na = {c['Na']:g}, Nv = {c['Nv']:g}, I = {c['I']:g}, R = {c['R']:g}.",
+            f"W = {lat['weight_kN']:.1f} kN; T = {v['T_s']:.3f} s; V = {v['V_kN']:.1f} kN ({v['Cs']*100:.1f}% W), governed by {v['governing']}.",
+            f"Moment frames on all grid lines, {l.base_fixity} bases, columns {b.engineering.column_section}. Drift ΔM X {d['X']['drift_m_mm']:.1f} mm / Y {d['Y']['drift_m_mm']:.1f} mm, limit {d['X']['limit_mm']:.0f} mm.",
+            'Wind, torsion, P-Δ, connections, base plates and anchor bolts are NOT designed.']
+
 def arc(c,r,a0,a1,n=12):return [(c[0]+r*math.cos(a0+(a1-a0)*i/n),c[1]+r*math.sin(a0+(a1-a0)*i/n)) for i in range(n+1)]
 
 def doors(b,r):
@@ -134,12 +146,14 @@ def sheet_set(b:Building,r,req:PermitRequest):
             if c.active:roof.rect('S-COLS',c.x-.1,c.y-.1,.2,.2,w=.35,fill=0,under=True)
         for i,beam in enumerate(st['beams']):
             roof.line('S-BEAM',(beam['x1'],beam['y']),(beam['x2'],beam['y']),w=.7);roof.text('S-ANNO',((beam['x1']+beam['x2'])/2,beam['y']-.25),f"B{i+1:02d} {beam['section']}",h=1.9)
+        for i,g in enumerate(st.get('girders',[])):
+            roof.line('S-BEAM',(g['x'],g['y1']),(g['x'],g['y2']),w=.5,dash=True);roof.text('S-ANNO',(g['x']+.2,(g['y1']+g['y2'])/2),f"G{i+1:02d}",h=1.7,align='left')
         if s.get('enabled') and s['layout']['y_extent']:
             y0,y1=s['layout']['y_extent'];sb=b.solar.edge_setback;roof.rect('E-PV',sb,y0,b.width-2*sb,y1-y0,w=.25,dash=True);roof.text('E-PV',(sb+.15,y0+.3),f"PV ARRAY ZONE +{s['layout']['dead_load_kPa']:.3f} kPa",h=1.9,align='left')
         dimensions(fnd,b,'S-ANNO')
         beams=[[f'B{i+1:02d}',f"{x['x1']:g}–{x['x2']:g} / {x['y']:g}",x['section'],f"{x['length']:.2f}",f"{x['service_q_kNm']:.2f}",f"{max(x['yield_utilization'],x['deflection_utilization'])*100:.0f}%",x['status'].upper()] for i,x in enumerate(st['beams'])]
         pads=[[x['column_id'],f'{e.footing_width:g} × {e.footing_width:g} × {e.footing_thickness:g}',f"{x['pressure_kPa']:.1f}",f"{x['allowable_kPa']}",x['status'].upper()] for x in st['foundations']]
-        notes=[f'Dead load {e.dead.value} kPa, live load {e.live.value} kPa ({e.dead.source}).',f'Combination {e.dead_factor}D + {e.live_factor}L — {e.combination_source}.',f'Steel E = {e.elastic_modulus:g} MPa, fy = {e.yield_strength:g} MPa; deflection limit L/{e.deflection_ratio:g}.',f"Allowable soil bearing {e.soil.value} kPa ({e.soil.basis}).",st.get('scope',''),'Wind, seismic, frame stability, connections and column buckling are NOT designed. Structural analysis and design by a licensed civil/structural engineer is required.']
+        notes=[f'Dead load {e.dead.value} kPa, live load {e.live.value} kPa ({e.dead.source}).',f'Combination {e.dead_factor}D + {e.live_factor}L — {e.combination_source}.',f'Steel E = {e.elastic_modulus:g} MPa, fy = {e.yield_strength:g} MPa; deflection limit L/{e.deflection_ratio:g}.',f"Allowable soil bearing {e.soil.value} kPa ({e.soil.basis}).",st.get('scope',''),*seismic_notes(b,r.get('lateral') or {}),'Structural analysis and design by a licensed civil/structural engineer is required.']
         if s.get('enabled'):notes.insert(1,f"PV superimposed dead load {s['layout']['dead_load_kPa']:.3f} kPa over the array zone; wind uplift not evaluated.")
         sheet('S-1','S','FOUNDATION PLAN, ROOF FRAMING PLAN & SCHEDULES',[fnd,roof],[('table','BEAM SCHEDULE',(['MARK','GRID','SECTION','SPAN m','w kN/m','UTIL','SCREEN'],beams,[.1,.2,.16,.12,.14,.12,.16])),('table','FOOTING SCHEDULE',(['COLUMN','PAD B×B×t (m)','q kPa','ALLOW','SCREEN'],pads,[.2,.3,.15,.15,.2])),('notes','STRUCTURAL NOTES',notes)])
     if 'E' in req.disciplines:

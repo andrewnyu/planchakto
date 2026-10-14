@@ -502,7 +502,55 @@
         "value": null,
         "unit": "g",
         "source": "Synthetic example \u2014 not verified project data",
-        "basis": "unsupported \u2014 unused by solver"
+        "basis": "superseded by lateral inputs; unused by solver"
+      },
+      "column_section": "SHS150",
+      "lateral": {
+        "enabled": true,
+        "zone": 4,
+        "soil_profile": "SD",
+        "soil_source": "NSCP 2015 \u00a7208: use SD when soil properties are not known in sufficient detail (verify)",
+        "importance": 1.0,
+        "r_factor": {
+          "value": 4.5,
+          "unit": "",
+          "source": "Synthetic example \u2014 not verified project data",
+          "basis": "Steel ordinary moment-resisting frame, R = 4.5 (UBC-97 Table 16-N lineage); confirm in NSCP 2015 Table 208-11"
+        },
+        "ct": 0.0853,
+        "na": {
+          "value": 1.0,
+          "unit": "",
+          "source": "Synthetic example \u2014 not verified project data",
+          "basis": "Site assumed \u2265 15 km from a Type A or B seismic source, so Na = 1.0; confirm with PHIVOLCS FaultFinder"
+        },
+        "nv": {
+          "value": 1.0,
+          "unit": "",
+          "source": "Synthetic example \u2014 not verified project data",
+          "basis": "Site assumed \u2265 15 km from a Type A or B seismic source, so Nv = 1.0; confirm with PHIVOLCS FaultFinder"
+        },
+        "ca": {
+          "value": null,
+          "unit": "",
+          "source": "Synthetic example \u2014 not verified project data",
+          "basis": "Optional Ca override; required where the built-in Table 208-7 transcription has no confirmed value"
+        },
+        "cv": {
+          "value": null,
+          "unit": "",
+          "source": "Synthetic example \u2014 not verified project data",
+          "basis": "Optional Cv override; required where the built-in Table 208-8 transcription has no confirmed value"
+        },
+        "base_fixity": "fixed",
+        "k_factor": 2.0,
+        "friction": {
+          "value": 0.35,
+          "unit": "",
+          "source": "Synthetic example \u2014 not verified project data",
+          "basis": "Assumed concrete-on-soil friction; take from the geotechnical report"
+        },
+        "sliding_fs": 1.0
       }
     },
     "brief": {
@@ -512,6 +560,44 @@
       "area_weight": 5,
       "change_weight": 2,
       "wet_weight": 8
+    },
+    "solar": {
+      "enabled": false,
+      "target_kwp": 6.0,
+      "module_watts": 590.0,
+      "module_length": 2.278,
+      "module_width": 1.134,
+      "module_mass": 28.0,
+      "racking_mass": 4.0,
+      "module_source": "Synthetic datasheet values \u2014 replace with the specified module",
+      "edge_setback": 0.6,
+      "setback_source": "User criterion. RA 9514 RIRR 10.2.19.9 (Solar PV) sets no rooftop pathway or edge setback dimension.",
+      "inverter_kw": 5.0,
+      "phases": 1,
+      "voltage": 230.0,
+      "peak_sun_hours": 4.8,
+      "performance_ratio": 0.8,
+      "yield_source": "Indicative PH planning values (4.8 h/day, PR 0.8); not a site irradiance study",
+      "service_main_a": 60.0,
+      "busbar_a": 100.0,
+      "transformer_kva": null,
+      "hosting_capacity_kw": null,
+      "customer_class": "residential",
+      "contracted_kw": null
+    },
+    "fire": {
+      "enabled": false,
+      "occupancy": "business",
+      "new_building": true,
+      "sprinklered": false,
+      "alarm": "none",
+      "emergency_lighting": false,
+      "exit_signs": false,
+      "hazard": "low",
+      "exits": [],
+      "extinguishers": [],
+      "mercantile_travel_m": null,
+      "mercantile_travel_source": "Not located: RIRR 10.2.15.2 \u00b66 defers to 10.2.5.2. Enter the value the C/MFM applies."
     },
     "rates": [
       {
@@ -639,6 +725,56 @@
         "name": "Electrical equipment \u00b7 blended allowance",
         "unit": "each",
         "rate": 3500.0,
+        "waste": 0.0,
+        "stock": null,
+        "source": "Demonstration catalog, not market pricing",
+        "date": "2026-10-13"
+      },
+      {
+        "id": "pv_modules",
+        "name": "PV modules",
+        "unit": "each",
+        "rate": 7500.0,
+        "waste": 0.0,
+        "stock": null,
+        "source": "Demonstration catalog, not market pricing",
+        "date": "2026-10-13"
+      },
+      {
+        "id": "pv_racking",
+        "name": "PV racking & fixings",
+        "unit": "m\u00b2",
+        "rate": 950.0,
+        "waste": 0.05,
+        "stock": null,
+        "source": "Demonstration catalog, not market pricing",
+        "date": "2026-10-13"
+      },
+      {
+        "id": "pv_inverter",
+        "name": "Grid-tie inverter & protection",
+        "unit": "each",
+        "rate": 65000.0,
+        "waste": 0.0,
+        "stock": null,
+        "source": "Demonstration catalog, not market pricing",
+        "date": "2026-10-13"
+      },
+      {
+        "id": "fire_extinguishers",
+        "name": "Portable fire extinguishers",
+        "unit": "each",
+        "rate": 2800.0,
+        "waste": 0.0,
+        "stock": null,
+        "source": "Demonstration catalog, not market pricing",
+        "date": "2026-10-13"
+      },
+      {
+        "id": "fire_exits",
+        "name": "Additional exit doors",
+        "unit": "each",
+        "rate": 18000.0,
         "waste": 0.0,
         "stock": null,
         "source": "Demonstration catalog, not market pricing",

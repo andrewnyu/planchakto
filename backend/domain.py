@@ -99,6 +99,24 @@ class Site(Model):
     drain: Point = Field(default_factory=lambda: Point(x=13,y=1,z=-.4))
     panel: Point = Field(default_factory=lambda: Point(x=1,y=4.75,z=0))
 
+class Lateral(Model):
+    """Seismic static lateral force inputs (NSCP 2015 §208). Site-specific values default to None so they read as missing, never assumed."""
+    enabled: bool = True
+    zone: Literal[2,4] = 4
+    soil_profile: Literal['SA','SB','SC','SD','SE','SF'] = 'SD'
+    soil_source: str = 'NSCP 2015 §208: use SD when soil properties are not known in sufficient detail (verify)'
+    importance: float = Field(default=1.0, gt=0, le=2)
+    r_factor: Parameter = Field(default_factory=lambda: Parameter(value=None, unit='', basis='Response modification factor R for the lateral system, NSCP 2015 Table 208-11'))
+    ct: float = Field(default=.0853, gt=0, le=.2)
+    na: Parameter = Field(default_factory=lambda: Parameter(value=None, unit='', basis='Near-source factor Na, NSCP 2015 Table 208-4; from seismic source type and distance (PHIVOLCS FaultFinder)'))
+    nv: Parameter = Field(default_factory=lambda: Parameter(value=None, unit='', basis='Near-source factor Nv, NSCP 2015 Table 208-5; from seismic source type and distance (PHIVOLCS FaultFinder)'))
+    ca: Parameter = Field(default_factory=lambda: Parameter(value=None, unit='', basis='Optional Ca override; required where the built-in Table 208-7 transcription has no confirmed value'))
+    cv: Parameter = Field(default_factory=lambda: Parameter(value=None, unit='', basis='Optional Cv override; required where the built-in Table 208-8 transcription has no confirmed value'))
+    base_fixity: Literal['fixed','pinned'] = 'fixed'
+    k_factor: float = Field(default=2.0, gt=0, le=5)
+    friction: Parameter = Field(default_factory=lambda: Parameter(value=None, unit='', basis='Base friction coefficient from the geotechnical report'))
+    sliding_fs: float = Field(default=1.0, ge=1, le=5)  # the 0.6D combination already carries the stability margin
+
 class Engineering(Model):
     dead: Parameter = Field(default_factory=lambda: Parameter(value=.65, unit='kPa'))
     live: Parameter = Field(default_factory=lambda: Parameter(value=.75, unit='kPa'))
@@ -114,7 +132,9 @@ class Engineering(Model):
     footing_thickness: float = Field(default=.3, gt=0, le=2)
     drain_slope: float = Field(default=.01, gt=0, le=.2)
     wind: Parameter = Field(default_factory=lambda: Parameter(value=None, unit='kPa', basis='unsupported — unused by solver'))
-    seismic: Parameter = Field(default_factory=lambda: Parameter(value=None, unit='g', basis='unsupported — unused by solver'))
+    seismic: Parameter = Field(default_factory=lambda: Parameter(value=None, unit='g', basis='superseded by lateral inputs; unused by solver'))
+    column_section: Literal['SHS150','SHS200','SHS250'] = 'SHS150'
+    lateral: Lateral = Field(default_factory=Lateral)
 
 class Solar(Model):
     """Optional rooftop PV. Every regulatory value is an editable input with its source; see backend/solar.py."""
@@ -247,7 +267,7 @@ class SwapRooms(Model):
     second: str
 class SetParameter(Model):
     type: Literal['set_parameter']
-    field: Literal['dead','live','soil','dead_factor','live_factor','deflection_ratio','footing_width','drain_slope','section']
+    field: Literal['dead','live','soil','dead_factor','live_factor','deflection_ratio','footing_width','drain_slope','section','column_section']
     value: float | str | None
     source: str = 'User-entered project assumption'
 class RemoveColumn(Model):
@@ -313,6 +333,9 @@ class AddElement(Model):
 class SetSolar(Model):
     type: Literal['set_solar']
     solar: Solar
+class SetLateral(Model):
+    type: Literal['set_lateral']
+    lateral: Lateral
 class SetFire(Model):
     type: Literal['set_fire']
     fire: FireProtection
@@ -323,7 +346,7 @@ class SetRoomRequirements(Model):
     max_area: float = Field(gt=0)
     min_dimension: float = Field(gt=0)
 
-Command = Annotated[MoveRoom|SwapRooms|SetParameter|RemoveColumn|SetEquipment|SetLock|Reroute|SetBrief|SetSite|SetRate|SetGrid|MoveFurniture|MoveFixture|MoveEquipment|AddElement|SetRoomRequirements|SetSolar|SetFire,Field(discriminator='type')]
+Command = Annotated[MoveRoom|SwapRooms|SetParameter|RemoveColumn|SetEquipment|SetLock|Reroute|SetBrief|SetSite|SetRate|SetGrid|MoveFurniture|MoveFixture|MoveEquipment|AddElement|SetRoomRequirements|SetSolar|SetFire|SetLateral,Field(discriminator='type')]
 class CommandRequest(Model):
     base_revision: str
     command_id: str = Field(min_length=1,max_length=128)
@@ -341,7 +364,8 @@ DEPENDENCIES={
  'set_rate':['quantities','budget'], 'set_grid':['geometry','structure','foundations','routing','quantities'],
  'move_furniture':['fitout','routing','quantities'], 'move_fixture':['routing','quantities'], 'move_equipment':['routing','electrical','quantities'], 'add_element':['routing','electrical','fitout','quantities'], 'set_room_requirements':['layout'],
  'set_solar':['solar','structure','foundations','electrical','quantities'],
- 'set_fire':['fire','egress','quantities']}
+ 'set_fire':['fire','egress','quantities'],
+ 'set_lateral':['structure','lateral','foundations','quantities']}
 
 def digest(value):
     if isinstance(value,BaseModel): value=value.model_dump(mode='json')
@@ -406,6 +430,7 @@ def apply_commands(model: Building, commands:list[Command]):
             else:b.furniture.append(Furniture(id=cmd.id,name=cmd.name,room_id=cmd.room_id,dx=cmd.dx,dy=cmd.dy,w=cmd.w,h=cmd.h))
         elif isinstance(cmd,SetSolar):b.solar=cmd.solar
         elif isinstance(cmd,SetFire):b.fire=cmd.fire
+        elif isinstance(cmd,SetLateral):b.engineering.lateral=cmd.lateral
         elif isinstance(cmd,SetRoomRequirements):
             if cmd.max_area<cmd.min_area:raise ValueError('Maximum area must be at least minimum area')
             r=obj(b.rooms,cmd.room_id);r.min_area=cmd.min_area;r.max_area=cmd.max_area;r.min_dimension=cmd.min_dimension
