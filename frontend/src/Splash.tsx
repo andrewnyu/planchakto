@@ -1,6 +1,7 @@
-import {ArrowRight,Box,CheckCircle2,Columns3,Droplets,FileText,Flame,GitBranch,MessageSquare,MousePointer2,PlayCircle,ShieldCheck,Sparkles,Sun,Table2} from 'lucide-react';
+import {ArrowRight,ArrowUpRight,Box,CheckCircle2,Columns3,Droplets,FileCheck2,FileText,Flame,GitBranch,MessageSquare,MousePointer2,Play,PlayCircle,ShieldCheck,Sparkles,Sun,Table2,Zap} from 'lucide-react';
 import type {Project} from './types';
 import {money,num} from './api';
+import type {Discipline} from './planning';
 
 const features=[
  {icon:GitBranch,title:'See every change before you accept it',text:'Each edit becomes a candidate revision. Geometry, checks and cost differences are shown side by side, and the accepted design is never overwritten.'},
@@ -21,7 +22,10 @@ const steps=[
  {icon:FileText,title:'Export for review',text:'Export a permit drawing set, the quantity takeoff or a printable review report.'},
 ];
 
-export function Splash({project,onStart,onAssistant}:{project:Project|null;onStart:()=>void;onAssistant:()=>void}){
+const planStages=['Site','Brief','Layout','Systems','Cost','Export'];
+const quickChecks:{id:Discipline;label:string;icon:typeof Flame}[]=[{id:'fire',label:'Fire protection',icon:Flame},{id:'plumbing',label:'Plumbing',icon:Droplets},{id:'electrical',label:'Electrical',icon:Zap},{id:'structure',label:'Structure',icon:Columns3}];
+
+export function Splash({project,onStart,onAssistant,onCheck,onSample}:{project:Project|null;onStart:()=>void;onAssistant:()=>void;onCheck:(discipline:Discipline)=>void;onSample:(discipline:'fire'|'plumbing')=>void}){
  const b=project?.accepted.model,r=project?.accepted.results;
  return <div className="splash">
   <header className="splash-bar"><div className="splash-brand"><span className="brand-mark"><Box size={22} strokeWidth={1.65}/></span><strong>Planchakto</strong><span className="splash-tag">BuildGraph engine</span></div><button className="button primary" onClick={onStart}>Open workspace <ArrowRight size={14}/></button></header>
@@ -31,13 +35,30 @@ export function Splash({project,onStart,onAssistant}:{project:Project|null;onSta
      <p className="splash-eyebrow">Building planning for Philippine teams</p>
      <h1>Plan it right before you build.</h1>
      <p className="splash-lede">Planchakto keeps the floor plan, structure, services, solar, fire safety and cost in one model. Change one thing and see everything it affects — checked, priced and ready for permit drawings.</p>
-     <div className="splash-actions"><button className="button primary large" onClick={onStart}>Open the demo project <ArrowRight size={15}/></button><a className="button secondary large" href="#how">How it works</a></div>
+     <div className="splash-actions"><a className="button primary large" href="#start">Choose how to start <ArrowRight size={15}/></a><a className="button secondary large" href="#how">How it works</a></div>
     </div>
     <div className="splash-trail" aria-label="How a change propagates">
      <span className="trail-label">One edit, traced end to end</span>
      {[['Edit','Move the bathroom 1.5 m'],['Geometry','walls, doors, circulation'],['Structure','beam and footing checks'],['Services','water, drain and conduit routes'],['Checks','pass · fail · missing input'],['Quantities','takeoff and peso cost']].map(([k,v],i)=><div key={k} className={'trail-step'+(i===5?' last':'')}><i>{i+1}</i><div><strong>{k}</strong><span>{v}</span></div></div>)}
      {b&&r&&<div className="trail-demo"><span>Demo project</span><strong>{b.name}</strong><small>{num(b.width*b.depth)} m² · {r.summary.pass} passing checks · {money(r.quantities.total)} estimate</small></div>}
     </div>
+   </section>
+   <section className="splash-paths" id="start" aria-label="Choose how to start">
+    <article className="path-card path-full">
+     <span className="path-eyebrow"><GitBranch size={14}/> Full planning</span>
+     <h2>Plan a project</h2>
+     <p>Work through the whole planning graph, from site and brief to structure, services, fire, solar and cost. Start from the demo project, generate layouts, or upload an existing plan at any step.</p>
+     <ol className="path-stages" aria-label="Planning stages">{planStages.map(s=><li key={s}>{s}</li>)}</ol>
+     <button className="button warm large" onClick={onStart}>Open the planning graph <ArrowRight size={15}/></button>
+    </article>
+    <article className="path-card path-quick">
+     <span className="path-eyebrow"><FileCheck2 size={14}/> Quick check</span>
+     <h2>Check a plan</h2>
+     <p>Already have drawings? Screen one system and see each finding with its evidence. Continue into the full plan when you are ready.</p>
+     <div className="path-checks">{quickChecks.map(c=><button key={c.id} onClick={()=>onCheck(c.id)}><c.icon size={15}/>{c.label}<ArrowUpRight size={12}/></button>)}</div>
+     <div className="path-samples"><span>No drawings to hand?</span><button className="text-button" onClick={()=>onSample('fire')}><Play size={12}/> Fire sample</button><button className="text-button" onClick={()=>onSample('plumbing')}><Play size={12}/> Plumbing sample</button></div>
+     <p className="path-note">BuildGraph project files are fully recalculated. PDFs and images are mapped onto the current model as a layout reference only.</p>
+    </article>
    </section>
    <section className="splash-section">
     <h2>What it does</h2>

@@ -4,18 +4,24 @@ import {Field} from './ui';
 import {disciplines, type Discipline} from './planning';
 
 export type DrawingAttachment = {name: string; mime_type: string; data: string; url: string};
+export type SampleDiscipline = 'plumbing' | 'fire';
+const samples: Record<SampleDiscipline, {label: string; helper: string}> = {
+  plumbing: {label: 'Try a plumbing sample', helper: 'The sample creates a candidate with direct service routes. Find clashes, preview clear routes, then compare quantities. Your accepted design is preserved.'},
+  fire: {label: 'Try a fire sample', helper: 'The sample is a single-storey office with no fire provisions yet. Review the egress and provision findings, add provisions, then compare quantities. Your accepted design is preserved.'},
+};
 export function ReviewUpload({initial, connected, onImport, onDrawing, onCurrent, onSample}: {
   initial: Discipline; connected: boolean;
   onImport: (model: unknown, discipline: Discipline, source: string) => Promise<void>;
   onDrawing: (drawing: DrawingAttachment, discipline: Discipline) => void;
   onCurrent: (discipline: Discipline) => void;
-  onSample: () => Promise<void>;
+  onSample: (discipline: SampleDiscipline) => Promise<void>;
 }) {
   const [discipline, setDiscipline] = useState(initial);
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState('');
   const [working, setWorking] = useState(false);
   const drawing = file && !file.name.toLowerCase().endsWith('.json');
+  const sample = discipline in samples ? samples[discipline as SampleDiscipline] : null;
   const act = async (fn: () => Promise<void>) => {
     setError(''); setWorking(true);
     try {await fn();} catch (e) {setError(e instanceof Error ? e.message : 'Could not read this plan. Choose the file again.');}
@@ -50,7 +56,7 @@ export function ReviewUpload({initial, connected, onImport, onDrawing, onCurrent
     {drawing && <p className="reference-note">This drawing is a layout reference. Its pipework, fire devices and engineering data are not automatically imported. {connected ? 'The next screen lets you review the request before sending it to the connected AI provider.' : 'An AI provider is not connected; native project reviews and the sample work locally.'}</p>}
     {error && <p className="inline-error" role="alert">{error}</p>}
     <button className="button primary full" disabled={working || !file || (!!drawing && !connected)} onClick={() => act(read)}>{working ? 'Validating plan…' : drawing ? 'Prepare drawing interpretation' : 'Upload & review model'}<ArrowRight size={15}/></button>
-    <div className="upload-alternatives"><button className="text-button" disabled={working} onClick={() => onCurrent(discipline)}>Use the current model <ArrowRight size={13}/></button><button className="text-button" disabled={working} onClick={() => act(onSample)}><Play size={13}/> Try a plumbing sample</button></div>
-    <p className="helper">The sample creates a candidate with direct service routes. Find clashes, preview clear routes, then compare quantities. Your accepted design is preserved.</p>
+    <div className="upload-alternatives"><button className="text-button" disabled={working} onClick={() => onCurrent(discipline)}>Use the current model <ArrowRight size={13}/></button>{sample && <button className="text-button" disabled={working} onClick={() => act(() => onSample(discipline as SampleDiscipline))}><Play size={13}/> {sample.label}</button>}</div>
+    {sample && <p className="helper">{sample.helper}</p>}
   </div>;
 }

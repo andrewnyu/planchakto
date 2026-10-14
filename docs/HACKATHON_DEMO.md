@@ -8,6 +8,7 @@ The progress indicator means “prepared in this model.” It does not mean code
 
 ## Three-minute path
 
+0. Start on the landing page. Point out the two ways in: **Plan a project** (the full planning graph, which this demo follows) and **Check a plan** (a one-system check for existing drawings). Choose **Open the planning graph**.
 1. Open the **Planning** graph. Point out that every card is an entry point and that the status comes from the active revision: available inputs, calculated screens, findings, missing inputs, or an optional/not-screened state.
 2. Choose **Review an existing plan**, leave **Plumbing** selected, then choose **Try a plumbing sample**. This creates a candidate and preserves the accepted project.
 3. Show the two real route findings on the focused review screen. The plan highlights the plumbing and structure layers; each finding can locate its source element.
@@ -16,6 +17,10 @@ The progress indicator means “prepared in this model.” It does not mean code
 6. Choose **Apply revision** only if you want to show the acceptance step. Until then, the saved design remains unchanged. Undo and revision history remain available after acceptance.
 
 ## Optional second moment: fire protection
+
+Quick-check route: choose **Home** in the left rail, then **Fire sample** on the **Check a plan** card. This imports a single-storey office with no fire provisions as a candidate and opens the fire review with four findings. Finish by choosing **Planning graph** to show that a quick check continues into the full plan.
+
+Full-plan route:
 
 1. Return to **Planning** and open **Fire protection**.
 2. Explain that the current residential brief is not silently treated as a supported occupancy. Choose a supported business or mercantile occupancy explicitly, then start the screen.
@@ -31,10 +36,11 @@ The fire screen is limited to the implemented single-storey business and mercant
 | PDF, PNG, JPEG, WebP | The configured AI provider maps recognizable rooms to the current model and proposes geometry changes | The file is a layout reference. Services, devices, loads, dimensions, and compliance are not inferred |
 | Current model | Opens the chosen discipline immediately | Useful when the plan is already in BuildGraph |
 | Plumbing sample | Imports a bundled model with direct routes as a candidate | A reliable local demo with no AI or network dependency |
+| Fire sample | Imports a bundled office (business occupancy, no provisions) as a candidate | A reliable local demo with no AI or network dependency |
 
 ## Presentation choices
 
-- Keep the opening on the graph. It answers “where am I?” before the audience sees the detailed editor.
+- Open on the landing page, then go straight to the graph. The two cards answer “what can I do here?”, and the graph answers “where am I?” before the audience sees the detailed editor.
 - Use one finding-to-fix loop. The plumbing sample is the clearest because the effect is visible on the plan and in quantities.
 - Keep advanced editing behind the graph cards and focused review actions. The audience sees the outcome before the implementation detail.
 - Say “screen,” “finding,” and “prepared.” Avoid “compliant,” “approved,” and “complete.”

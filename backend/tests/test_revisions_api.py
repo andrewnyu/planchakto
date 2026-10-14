@@ -87,6 +87,17 @@ def test_quick_review_sample_reroutes_without_overwriting_accepted(client):
     assert difference['cost_delta']>0
     assert any(q['delta']>0 for q in difference['quantities'])
 
+def test_quick_review_fire_sample_opens_with_findings(client):
+    project=client.get('/api/project').json()
+    sample=client.get('/api/examples/fire')
+    assert sample.status_code==200
+    model=sample.json()['model']
+    assert model['fire']['enabled'] and model['fire']['occupancy']=='business'
+    uploaded=client.post('/api/import/project',json={'model':model}).json()
+    failing={c['rule_id'] for c in uploaded['results']['checks'] if c['rule_id'].startswith('FIRE-') and c['status']=='fail'}
+    assert {'FIRE-SIGNS','FIRE-EXT'}<=failing
+    assert client.get('/api/project').json()['state']['head']==project['state']['head']
+
 @pytest.mark.parametrize('action,commands,revision,valid',[
  ('edit',[{'type':'set_equipment','equipment_id':'eq-ac','watts':2000}],'a',True),
  ('edit',[{'type':'set_parameter','field':'soil','value':75}],'a',True),

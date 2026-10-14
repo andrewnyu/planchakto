@@ -5,7 +5,7 @@ from fastapi import FastAPI,Request
 from fastapi.responses import JSONResponse,Response,HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError,Field
-from .domain import Building,CommandRequest,Model,digest
+from .domain import Building,CommandRequest,FireProtection,Model,digest
 from .store import LocalStore,Conflict
 from .engine import ENGINE_VERSION,validate_result,compute
 from .drawings import PermitRequest,render_pdf,render_dxf
@@ -51,6 +51,13 @@ def plumbing_example():
     model=example()
     model.routing_mode='direct'
     return {'model':model,'label':'Plumbing demo · direct routes'}
+@app.get('/api/examples/fire')
+def fire_example():
+    # A supported business occupancy with no provisions yet, so the screen opens with real findings.
+    model=example()
+    model.brief.use='Small professional office'
+    model.fire=FireProtection(enabled=True,occupancy='business')
+    return {'model':model,'label':'Fire demo · office, no provisions'}
 @app.get('/api/project')
 def project():
     state=store().state();s=revision(state['head'])
