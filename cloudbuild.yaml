@@ -15,6 +15,7 @@ steps:
       - '--allow-unauthenticated'
       - '--memory=1Gi'
       - '--cpu=1'
+      - '--cpu-boost'
       - '--concurrency=8'
       - '--timeout=180'
       - '--min-instances=0'

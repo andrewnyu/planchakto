@@ -50,6 +50,8 @@ def obstacle_geometry(b):
     # 50 mm clearance from obstacle faces; routing planes are authorized above/below partitions.
     return unary_union([box(o['x'],o['y'],o['x']+o['w'],o['y']+o['h']).buffer(.05,join_style=2) for o in objects]),objects
 
+def o_name(o):return f"{o.get('name') or 'column'} ({o['id']})"
+
 def route_all(b:Building):
     rooms={r.id:r for r in b.rooms};geom,obs=obstacle_geometry(b);routes=[]
     minx,miny,maxx,maxy=bounds=(-1.5,-1.5,b.width+1.5,b.depth+1.5)
@@ -62,7 +64,12 @@ def route_all(b:Building):
             status='pass';reason='Connected; physical route checked against buffered structural obstacles'
             if not (r.x<=local[0]<=r.x+r.w and r.y<=local[1]<=r.y+r.h):path=None;reason='Connection point falls outside its room'
             if not all(minx<=p[0]<=maxx and miny<=p[1]<=maxy for p in [start,end]):path=None;reason='Endpoint is outside the permitted routing envelope'
-            if path is None:status='fail';reason=reason if reason.startswith(('Connection','Endpoint')) else 'No connected route on the permitted 0.25 m graph'
+            if path is None:
+                status='fail'
+                if not reason.startswith(('Connection','Endpoint')):
+                    # Name the obstacle when an endpoint sits inside its clearance zone; that is the usual cause and the fix is to move the item.
+                    hit=next((o for o in obs for p in [start,end] if box(o['x'],o['y'],o['x']+o['w'],o['y']+o['h']).buffer(.05,join_style=2).intersects(Point(p))),None)
+                    reason=f"{item.name} connection point lies within the 50 mm clearance of {o_name(hit)}; move the {'fixture' if kind!='conduit' else 'equipment'} clear of it" if hit else 'No connected route on the permitted 0.25 m graph'
             elif blocked(path,geom):status='fail';reason='Route intersects a structural obstacle; generate an obstacle-aware alternative'
             distance=length(path) if path else 0
             fall=item.elevation-utility.z if kind=='drain' else None
