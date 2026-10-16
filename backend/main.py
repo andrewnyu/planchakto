@@ -16,6 +16,9 @@ from .geometry import parse_survey,validate_site
 from .layout import generate_layouts
 from .ai import AIRequest,interpret,status
 from .example import example
+from .compose import ProjectSpec,TEMPLATES,Template,template_spec,apply_answer,questions_for,compose,preview
+from .ai import compose_turn
+from typing import Literal,Any
 
 app=FastAPI(title='BuildGraph',version='0.1.0')
 logging.basicConfig(level=logging.INFO,format='%(levelname)s %(name)s: %(message)s')
@@ -94,6 +97,47 @@ def layouts(id:str):
         revision=store().preview(CommandRequest(base_revision=id,command_id=uuid.uuid4().hex,label=c['label'],commands=c['commands']))
         entries.append({**c,'revision':revision})
     return {**generated,'candidates':entries}
+class ComposeAnswer(Model):
+    field:str
+    value:Any=None
+class ComposeMessage(Model):
+    role:Literal['user','assistant']
+    text:str=Field(max_length=2000)
+class ComposeRequest(Model):
+    template:Template
+    spec:ProjectSpec|None=None
+    message:str|None=Field(default=None,max_length=4000)
+    answers:list[ComposeAnswer]=Field(default_factory=list,max_length=20)
+    history:list[ComposeMessage]=Field(default_factory=list,max_length=40)
+class BuildRequest(Model):spec:ProjectSpec
+@app.get('/api/compose/templates')
+def compose_templates():
+    return [{'id':k,'label':t['label'],'use':t['use'],'height':t['height'],'rooms':[{'name':n,'kind':kd,'area':a,'count':c} for n,kd,a,c in t['rooms']]} for k,t in TEMPLATES.items()]
+@app.post('/api/compose/turn')
+def compose_step(req:ComposeRequest):
+    spec=req.spec if req.spec and req.spec.template==req.template else template_spec(req.template)
+    said=[]
+    for a in req.answers:
+        bank={q['field']:q for q in questions_for(spec)}
+        spec=apply_answer(spec,a.field,a.value)
+        label=next((o['label'] for o in bank.get(a.field,{}).get('options',[]) if o['value']==a.value),None)
+        said.append(f"{bank[a.field]['header'] if a.field in bank else a.field.replace('_',' ').capitalize()}: {(label or str(a.value)).replace(' (Recommended)','')}")
+    reply,ai_questions,mode=None,[],'deterministic'
+    if req.message:
+        try:
+            out=compose_turn(req.template,spec,[m.model_dump() for m in req.history],req.message);spec,reply,ai_questions,mode=out['spec'],out['reply'],out['questions'],'live'
+        except RuntimeError as e:reply,mode=str(e),'unavailable'
+        except Exception as e:
+            log.exception('Compose turn failed');reply,mode=f'The assistant could not process that ({type(e).__name__}). Nothing changed; try rephrasing or pick a suggestion.','error'
+    elif said:reply='Noted. '+'; '.join(said)+'.'
+    asked={q['field'] for q in ai_questions}
+    pending=questions_for(spec)
+    questions=(ai_questions+[q for q in pending if q['field'] not in asked])[:4]
+    return {'spec':spec,'reply':reply,'questions':questions,'remaining':len(pending),'preview':preview(spec),'mode':mode,**status()}
+@app.post('/api/compose/build')
+def compose_build(req:BuildRequest):
+    b,notes=compose(req.spec)
+    return {'revision':store().import_model(b,label=f'New project · {b.name}'[:120]),'notes':notes}
 @app.post('/api/import/project')
 def import_project(req:ImportRequest):return store().import_model(req.model)
 @app.post('/api/import/survey')

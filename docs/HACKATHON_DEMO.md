@@ -6,6 +6,13 @@ BuildGraph turns one building model into a visible planning process. A user can 
 
 The progress indicator means “prepared in this model.” It does not mean code-approved, permit-ready, or professionally reviewed.
 
+## New project path (recommended for the video)
+
+1. On the landing page choose **Start a new project**, then **Commercial building**.
+2. Describe it, for example: *A dental clinic in Cebu City called Ngiti Dental, with 3 treatment rooms, a waiting area for 12, a sterilisation room, an office, two toilets and a pantry.* Gemini rewrites the room programme and asks only about undecided fields; the plan preview on the right updates with every answer.
+3. Answer the suggested questions (budget, eave height, occupancy, rear exit, fire provisions, solar, fault distance, soil, frame, footing friction). Point out that the fault distance is asked, never assumed, and that unanswered values stay missing inputs.
+4. Type a change, e.g. *make the waiting area 30 m² and add a second office*, then choose **Build project**. The new building arrives as a candidate on the planning graph with structure, seismic, services, fire, solar and cost already screened.
+
 ## Three-minute path
 
 0. Start on the landing page. Point out the two ways in: **Plan a project** (the full planning graph, which this demo follows) and **Check a plan** (a one-system check for existing drawings). Choose **Open the planning graph**.

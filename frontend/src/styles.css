@@ -102,7 +102,9 @@
 .path-full h2{color:#fff}
 .path-full>p{color:#bccab9}
 .path-full .path-eyebrow{color:#e0a676}
-.path-full .button{margin-top:auto}
+.path-full .path-buttons{margin-top:auto;display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.button.ghost-light{background:transparent;color:#e7eddf;border:1px solid rgba(255,255,255,.25)}
+.button.ghost-light:hover{background:rgba(255,255,255,.08)}
 .path-stages{list-style:none;margin:0 0 6px;padding:0;display:flex;flex-wrap:wrap;gap:6px;counter-reset:stage}
 .path-stages li{counter-increment:stage;font-size:11px;color:#dfe7da;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:4px 10px 4px 6px;display:inline-flex;align-items:center;gap:6px}
 .path-stages li:before{content:counter(stage);font:10px 'Geist Mono',monospace;color:#e0a676;width:16px;height:16px;border-radius:50%;background:rgba(224,166,118,.14);display:inline-grid;place-items:center}

@@ -21,7 +21,7 @@ class Parameter(Model):
 class Room(Model):
     id: str
     name: str
-    kind: Literal['living','kitchen','bathroom','bedroom','office','corridor']
+    kind: Literal['living','kitchen','bathroom','bedroom','office','retail','storage','corridor']
     x: float
     y: float
     w: float = Field(gt=0, le=30)

@@ -9,3 +9,4 @@ frontend/dist/
 artifacts/
 .DS_Store
 frontend/tsconfig.tsbuildinfo
+.impeccable/review/

@@ -2,7 +2,7 @@ import {useRef,useState} from 'react';
 import {MousePointer2,Hand,Move,Plus,Minus,Maximize,Compass} from 'lucide-react';
 import type {Building,Result,Layers,Room} from './types';
 import {num} from './api';
-export const roomColors:Record<string,string>={living:'#ebe8df',kitchen:'#e8ebe0',bathroom:'#e0eae6',bedroom:'#e9e5dd',office:'#e6e8e3',corridor:'#f4f2ec'};
+export const roomColors:Record<string,string>={living:'#ebe8df',kitchen:'#e8ebe0',bathroom:'#e0eae6',bedroom:'#e9e5dd',office:'#e6e8e3',retail:'#efe6da',storage:'#e3e5e8',corridor:'#f4f2ec'};
 export const layerColors:Record<string,string>={architecture:'#738071',structure:'#58726a',electrical:'#9275bd',plumbing:'#328b91',furniture:'#a8997e',solar:'#c9892e',fire:'#2f8a57',terrain:'#aaa174'};
 export function Plan({model:b,result:r,layers,selected,onSelect,onMove,accepted,compare=false,site=false,readOnly=false}:{model:Building;result:Result;layers:Layers;selected:string;onSelect:(id:string)=>void;onMove:(room:Room,x:number,y:number)=>void;accepted?:Building;compare?:boolean;site?:boolean;readOnly?:boolean}){
  const [zoom,setZoom]=useState(1),[tool,setTool]=useState('select'),[pan,setPan]=useState({x:0,y:0}),[drag,setDrag]=useState<{id:string,x:number,y:number,startX:number,startY:number}|null>(null);

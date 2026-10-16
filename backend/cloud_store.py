@@ -72,7 +72,7 @@ class GoogleStore(LocalStore):
             if not 0<=i<len(state['history']):raise Conflict('No revision in that direction')
             state.update(cursor=i,head=state['history'][i]);tx.set(self.root,state);return state['head']
         return self.get(travel_tx(self.fs.transaction()))
-    def import_model(self,model):
-        state=self.state();s=self.make_snapshot(model,state['head'],'Imported native project',[{'type':'import_native_project'}],['all'],state['head']);self._write(s);return s
+    def import_model(self,model,label='Imported native project'):
+        state=self.state();s=self.make_snapshot(model,state['head'],label,[{'type':'import_native_project'}],['all'],state['head']);self._write(s);return s
     def rerun(self,id):
         base=self.get(id);s=self.make_snapshot(Building.model_validate(base['model']),id,'Recomputed analysis',[],['all'],base['fork_head'] if base['status']=='candidate' else id);self._write(s);return s

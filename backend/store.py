@@ -94,8 +94,8 @@ class LocalStore:
             if i<0 or i>=len(state['history']):raise Conflict('No revision in that direction')
             state['cursor']=i;state['head']=state['history'][i];db.execute('UPDATE state SET data=? WHERE id=1',(json.dumps(state),))
         return self.get(state['head'])
-    def import_model(self,model):
-        state=self.state();s=self.make_snapshot(model,state['head'],'Imported native project',[{'type':'import_native_project'}],['all'],state['head'])
+    def import_model(self,model,label='Imported native project'):
+        state=self.state();s=self.make_snapshot(model,state['head'],label,[{'type':'import_native_project'}],['all'],state['head'])
         with self.db() as db:db.execute('INSERT INTO snapshots VALUES (?,?)',(s['id'],json.dumps(s)))
         return s
     def rerun(self,id):

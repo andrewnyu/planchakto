@@ -25,7 +25,7 @@ const steps=[
 const planStages=['Site','Brief','Layout','Systems','Cost','Export'];
 const quickChecks:{id:Discipline;label:string;icon:typeof Flame}[]=[{id:'fire',label:'Fire protection',icon:Flame},{id:'plumbing',label:'Plumbing',icon:Droplets},{id:'electrical',label:'Electrical',icon:Zap},{id:'structure',label:'Structure',icon:Columns3}];
 
-export function Splash({project,onStart,onAssistant,onCheck,onSample}:{project:Project|null;onStart:()=>void;onAssistant:()=>void;onCheck:(discipline:Discipline)=>void;onSample:(discipline:'fire'|'plumbing')=>void}){
+export function Splash({project,onNewProject,onStart,onAssistant,onCheck,onSample}:{project:Project|null;onNewProject:()=>void;onStart:()=>void;onAssistant:()=>void;onCheck:(discipline:Discipline)=>void;onSample:(discipline:'fire'|'plumbing')=>void}){
  const b=project?.accepted.model,r=project?.accepted.results;
  return <div className="splash">
   <header className="splash-bar"><div className="splash-brand"><span className="brand-mark"><Box size={22} strokeWidth={1.65}/></span><strong>Planchakto</strong><span className="splash-tag">BuildGraph engine</span></div><button className="button primary" onClick={onStart}>Open workspace <ArrowRight size={14}/></button></header>
@@ -47,9 +47,9 @@ export function Splash({project,onStart,onAssistant,onCheck,onSample}:{project:P
     <article className="path-card path-full">
      <span className="path-eyebrow"><GitBranch size={14}/> Full planning</span>
      <h2>Plan a project</h2>
-     <p>Work through the whole planning graph, from site and brief to structure, services, fire, solar and cost. Start from the demo project, generate layouts, or upload an existing plan at any step.</p>
+     <p>Start a new house, commercial building or warehouse from a template and describe it in your own words, or open the demo project. Then work through site, structure, services, fire, solar and cost.</p>
      <ol className="path-stages" aria-label="Planning stages">{planStages.map(s=><li key={s}>{s}</li>)}</ol>
-     <button className="button warm large" onClick={onStart}>Open the planning graph <ArrowRight size={15}/></button>
+     <div className="path-buttons"><button className="button warm large" onClick={onNewProject}>Start a new project <ArrowRight size={15}/></button><button className="button ghost-light" onClick={onStart}>Open the demo project</button></div>
     </article>
     <article className="path-card path-quick">
      <span className="path-eyebrow"><FileCheck2 size={14}/> Quick check</span>

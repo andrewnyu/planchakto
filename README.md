@@ -8,6 +8,16 @@ Built for small PH architecture and engineering teams iterating on a modest sing
 
 ## What it does
 
+- **Start a new project from a template.** Pick a house, a commercial building or a warehouse and describe it in plain language. Gemini turns the description into a typed project spec (name, location, use and room programme). It then asks only about what is still undecided, offering two to four suggested answers per question that you select, as in a guided interview. Picking a suggestion applies a validated value instantly; free text goes back to Gemini. A deterministic generator (`backend/compose.py`) builds the model from the spec:
+  - it lays out two room strips around the corridor
+  - it places columns in shared walls clear of every corridor door
+  - it chooses the coarsest grid and the lightest beam, column and pad sizes that pass the checks
+  - it adds fixtures, lighting, power and air conditioning
+  - it places fire provisions and extinguishers until the Table 7 screen passes
+  - it sets seismic inputs only from your answers
+
+  Unanswered site values (fault distance, R, friction) stay `missing_input`. The result lands as a candidate revision, so the accepted design is kept until you apply it. Only single-storey footprints up to 30 × 30 m are supported, and the assistant says so when asked for more.
+
 - **See the full process.** The Planning graph is the default workspace. It connects site and brief inputs to layout, coordinated disciplines, quantities, and review/export. Progress comes from the current revision's inputs and computed screens; it never presents model preparation as professional approval.
 - **Review one system.** Upload a native BuildGraph project and go straight to plumbing, fire protection, electrical, structural, or solar findings. A PDF or image can be used as a layout reference through the configured AI provider, with a geometry-confirmation step before discipline review. The built-in plumbing sample gives the demo a reliable finding → fix → cost-impact loop.
 - **Edit the plan.** Move or swap rooms, move fixtures, furniture and equipment, change loads, remove columns, or edit the brief, grid and site. Edits work in a 2D scaled plan and a synchronized 3D model.
