@@ -11,6 +11,15 @@ Hackathon constraints that shape technical choices:
 - The app is deployed on **Cloud Run** (project `planchakto`, region `asia-southeast1`) and must stay publicly reachable.
 - The repo becomes public. Never commit secrets, `.env`, `.data/` or `artifacts/`. `artifacts/` holds the deck, video and submission form; it is gitignored and owned by the user.
 
+## Context sources and precedence
+
+- This root `AGENTS.md` is the canonical cross-agent context. `CLAUDE.md` is a thin adapter that imports it; do not duplicate these instructions there.
+- The non-negotiables below are product promises and take precedence over an implementation that accidentally violates them.
+- A nearer nested `AGENTS.md` may add subtree-specific rules but may not weaken the root non-negotiables.
+- `PRODUCT.md` owns durable audience, scope and product principles. `DESIGN.md` owns durable interaction and visual-system decisions.
+- Feature plans in `docs/` explain implementation detail and history. They are not authority over the canonical context after a feature ships.
+- Code, tests and recent commits are evidence of current behavior. When they disagree with a documented invariant, report the mismatch instead of silently rewriting the invariant.
+
 ## Non-negotiables
 
 These are product promises. A change that breaks one is a bug, even if the tests pass.
@@ -133,16 +142,23 @@ npm test --prefix frontend
 ## Ownership and coordination
 
 - Historically Codex built the core backend and engine, and Claude took the frontend and review. Since 2026-10-17 either agent may work across the stack when the user asks.
-- One writer per file set at a time. If you are changing `engine.py`, `rules.py` or `domain.py`, note it here or in your PR description, because many modules depend on them.
+- One writer per file set at a time. Register active work in the table below before editing shared or cross-cutting files. Remove or close the row when the work is committed, abandoned or handed off.
 - Leave the demo fixture (`example()`) and its results unchanged unless the task is about the demo. The hackathon video and the deck depend on its numbers.
+
+### Active work
+
+| Owner | Scope | Files | State |
+|---|---|---|---|
+| Codex | Shared agent context | `AGENTS.md`, `CLAUDE.md`, `DESIGN.md` | Context update complete locally; uncommitted |
 
 ## Status (2026-10-17)
 
-- Done:
+- On `origin/main` through `e82b194`:
   - full planning workspace (planning graph, discipline reviews, candidates, undo);
   - design agent with live evals (32/32);
   - structure, seismic, routing, fire, solar and quantities;
   - permit PDF/DXF export;
-  - Cloud Run deploy;
-  - **Quick check for structural framing plans** (live eval 3/3 on gemini-3.8-flash).
-- Next: Quick check phase 6 (see above), then deck and video updates for the Quick check moment ([docs/HACKATHON_DEMO.md](docs/HACKATHON_DEMO.md) has the script).
+  - Cloud Run deploy.
+- Committed on local `main` at `5434133`, not yet on `origin/main`:
+  - **Quick Check for structural framing plans**. Its committed docs report a 3/3 live evaluation on `gemini-3.8-flash`; this context pass did not rerun it.
+- Next after the local commit is pushed: Quick Check phase 6 (see above), then deck and video updates for the Quick Check moment ([docs/HACKATHON_DEMO.md](docs/HACKATHON_DEMO.md) has the script).
