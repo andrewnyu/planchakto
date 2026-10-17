@@ -4,10 +4,11 @@ import type {Building, Check, Result} from './types';
 import {api, num} from './api';
 import {Field, Status} from './ui';
 import type {Discipline} from './planning';
+import {FIRE_RULES, FIRE_TARGET, FIRE_TARGET_LABEL, FireConfirmPanel, FireSheetView, fireLabel, type FireExtraction, type FireInputs} from './QuickFire';
 import './quickcheck.css';
 
 type Level = 'read' | 'assumed' | 'missing' | 'conflict' | 'unsupported';
-type Note = {level: Level; field?: string | null; message: string; box?: number[] | null};
+export type Note = {level: Level; field?: string | null; message: string; box?: number[] | null};
 export type QuickInputs = {
   grid_x: number[]; grid_y: number[]; grid_x_labels: string[]; grid_y_labels: string[]; columns: [number, number][];
   height: number | null; section: string; column_section: string; dead: number | null; live: number | null; soil: number | null;
@@ -17,26 +18,37 @@ export type QuickInputs = {
 type Transform = {sx: number; ox: number; sy: number; oy: number; residual: number};
 type Callout = {applies_to: string; text: string; box?: number[] | null};
 type Load = {kind: string; value: number | null; unit: string; text: string; box?: number[] | null};
-export type QuickCheckRecord = {
-  id: string; discipline: 'structure'; status: 'confirm' | 'checked'; mode: 'live' | 'recorded';
+type QuickResult = Result & {coverage?: {checked: string[]; not_checked: {item: string; reason: string}[]}};
+type RecordBase = {
+  id: string; status: 'confirm' | 'checked'; mode: 'live' | 'recorded';
   source: {name: string; mime_type: string; page: number; pages: number; width_px: number; height_px: number};
-  extraction: {title: string; sections: Callout[]; loads: Load[]};
-  inputs: QuickInputs; transform: Transform | null; notes: Note[]; model: Building | null; results: (Result & {coverage?: {checked: string[]; not_checked: {item: string; reason: string}[]}}) | null;
+  transform: Transform | null; notes: Note[]; model: Building | null; results: QuickResult | null;
 };
+export type StructureRecord = RecordBase & {discipline: 'structure'; extraction: {title: string; sections: Callout[]; loads: Load[]}; inputs: QuickInputs};
+export type FireRecord = RecordBase & {discipline: 'fire'; extraction: FireExtraction; inputs: FireInputs};
+export type QuickCheckRecord = StructureRecord | FireRecord;
+type Checkable = 'structure' | 'fire';
 
 const BEAMS = [['RHS150', 'RHS 150 × 100 × 5'], ['RHS200', 'RHS 200 × 100 × 6'], ['RHS250', 'RHS 250 × 150 × 8']];
 const COLUMNS = [['SHS150', 'SHS 150 × 150 × 6'], ['SHS200', 'SHS 200 × 200 × 8'], ['SHS250', 'SHS 250 × 250 × 9']];
 const RULES: Record<string, string> = {SLS: 'Beam deflection', ELASTIC: 'Beam stress', BEARING: 'Footing bearing', 'SEISMIC-V': 'Seismic base shear', DRIFT: 'Storey drift', COLUMN: 'Column capacity', 'FRAME-MEMBER': 'Frame member flexure', 'FOOT-LATERAL': 'Footing under seismic load', WIND: 'Wind', 'PH-CODE': 'Outside this screen'};
 const LABELS: Record<string, string> = {grid_x: 'Grid spacing', grid_y: 'Grid spacing', columns: 'Columns', height: 'Storey height', section: 'Roof beam section', column_section: 'Column section', dead: 'Dead load', live: 'Live load', soil: 'Soil bearing', footing_width: 'Footing size', footing_thickness: 'Footing size', zone: 'Seismic zone', r_factor: 'R', na: 'Na', nv: 'Nv', friction: 'Base friction'};
-const ORDER = ['fail', 'missing_input', 'unsupported', 'pass', 'not_applicable'];
-const OTHER: {id: Discipline; label: string; icon: typeof Flame}[] = [{id: 'fire', label: 'Fire protection', icon: Flame}, {id: 'plumbing', label: 'Plumbing', icon: Droplets}, {id: 'electrical', label: 'Electrical', icon: Zap}];
+export const ORDER = ['fail', 'missing_input', 'unsupported', 'pass', 'not_applicable'];
+const READY: {id: Checkable; label: string; icon: typeof Flame}[] = [{id: 'structure', label: 'Structure', icon: Columns3}, {id: 'fire', label: 'Fire protection', icon: Flame}];
+const OTHER: {id: Discipline; label: string; icon: typeof Flame}[] = [{id: 'plumbing', label: 'Plumbing', icon: Droplets}, {id: 'electrical', label: 'Electrical', icon: Zap}];
+const COPY: Record<Checkable, {eyebrow: string; body: string; file: string; page: string; sample: string; check: string}> = {
+  structure: {eyebrow: 'QUICK CHECK · STRUCTURE', body: 'Upload a roof framing plan. Gemini reads the grid, columns, member sizes and loads off the sheet. You confirm what it read, then the structural screen runs on exactly that, and every finding is pinned to the drawing.',
+    file: 'Choose a framing plan', page: 'PDF page with the framing plan', sample: 'Try the sample framing plan', check: 'structural'},
+  fire: {eyebrow: 'QUICK CHECK · FIRE PROTECTION', body: 'Upload a single-storey floor plan. Gemini reads the outline, rooms, doors, exits and extinguishers off the sheet. You choose the occupancy and confirm the plan, then the RA 9514 egress screen runs on exactly that, with the worst travel path drawn on the sheet.',
+    file: 'Choose a floor plan', page: 'PDF page with the floor plan', sample: 'Try the sample floor plan', check: 'fire and egress'},
+};
 
-export function QuickCheck({initialId, connected, visionModel, onHome, onWorkspace, onDemoReview, onDemoSample}: {
-  initialId?: string; connected: boolean; visionModel?: string | null;
+export function QuickCheck({initialId, initialDiscipline = 'structure', connected, visionModel, onHome, onWorkspace, onDemoReview, onDemoSample}: {
+  initialId?: string; initialDiscipline?: Checkable; connected: boolean; visionModel?: string | null;
   onHome: () => void; onWorkspace: () => void; onDemoReview: (discipline: Discipline) => void; onDemoSample: (discipline: 'fire' | 'plumbing') => void;
 }) {
   const [record, setRecord] = useState<QuickCheckRecord | null>(null);
-  const [inputs, setInputs] = useState<QuickInputs | null>(null);
+  const [inputs, setInputs] = useState<QuickInputs | FireInputs | null>(null);
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(''), [error, setError] = useState('');
   const [selected, setSelected] = useState<string[]>([]);
@@ -54,7 +66,8 @@ export function QuickCheck({initialId, connected, visionModel, onHome, onWorkspa
     else try {history.replaceState(null, '', '#quick-check')} catch {}
   }, [initialId]);
   const step = !record ? 'upload' : record.status === 'checked' && !editing ? 'results' : 'confirm';
-  const run = () => act('Running the structural check', async () => {open(await api<QuickCheckRecord>(`/quick-checks/${record!.id}/run`, inputs))});
+  const run = () => act(`Running the ${COPY[record!.discipline].check} check`, async () => {open(await api<QuickCheckRecord>(`/quick-checks/${record!.id}/run`, inputs))});
+  const shown = step === 'confirm' ? inputs! : record?.inputs;
 
   return <div className="quick-page">
     <header className="splash-bar quick-bar">
@@ -66,16 +79,19 @@ export function QuickCheck({initialId, connected, visionModel, onHome, onWorkspa
         <li key={id} className={step === id ? 'active' : ['upload', 'confirm', 'results'].indexOf(step) > i ? 'done' : ''}><i>{i + 1}</i>{label}</li>)}
     </ol>
     {error && <p className="inline-error quick-error" role="alert">{error}</p>}
-    {step === 'upload' ? <UploadStep connected={connected} visionModel={visionModel} busy={busy} onRead={(label, fn) => act(label, async () => open(await fn()))} onDemoReview={onDemoReview} onDemoSample={onDemoSample}/> :
+    {step === 'upload' ? <UploadStep initial={initialDiscipline} connected={connected} visionModel={visionModel} busy={busy} onRead={(label, fn) => act(label, async () => open(await fn()))} onDemoReview={onDemoReview} onDemoSample={onDemoSample}/> :
       <div className="quick-layout">
         <section className="quick-sheet" aria-label="Uploaded drawing">
-          <SheetView record={record!} inputs={step === 'confirm' ? inputs! : record!.inputs} results={step === 'results' ? record!.results : null} selected={selected}
-            onSelect={id => setSelected([id])}
-            onToggleColumn={step === 'confirm' ? (i, j) => setInputs(edit(inputs!, 'columns', inputs!.columns.some(c => c[0] === i && c[1] === j) ? inputs!.columns.filter(c => !(c[0] === i && c[1] === j)) : [...inputs!.columns, [i, j]])) : undefined}/>
+          {record!.discipline === 'fire' ? <FireSheetView record={record!} inputs={shown as FireInputs} results={step === 'results' ? record!.results : null} selected={selected} onSelect={id => setSelected([id])}/> :
+            <SheetView record={record!} inputs={shown as QuickInputs} results={step === 'results' ? record!.results : null} selected={selected}
+              onSelect={id => setSelected([id])}
+              onToggleColumn={step === 'confirm' ? (i, j) => {const s = inputs as QuickInputs; setInputs(edit(s, 'columns', s.columns.some(c => c[0] === i && c[1] === j) ? s.columns.filter(c => !(c[0] === i && c[1] === j)) : [...s.columns, [i, j]]))} : undefined}/>}
         </section>
         <aside className="quick-panel">
           {record!.mode === 'recorded' && <p className="quick-recorded"><FileCheck2 size={14}/> Recorded reading of the sample sheet. No AI call was made{connected ? '' : '; connect Gemini to read your own drawings'}.</p>}
-          {step === 'confirm' ? <ConfirmPanel record={record!} inputs={inputs!} setInputs={setInputs} busy={busy} onRun={run} onCancel={record!.status === 'checked' ? () => {setEditing(false); setInputs(record!.inputs)} : undefined}/> :
+          {step === 'confirm' ? (record!.discipline === 'fire' ?
+            <FireConfirmPanel record={record!} inputs={inputs as FireInputs} setInputs={setInputs} busy={busy} onRun={run} selected={selected} onSelect={id => setSelected([id])} onCancel={record!.status === 'checked' ? () => {setEditing(false); setInputs(record!.inputs)} : undefined}/> :
+            <ConfirmPanel record={record!} inputs={inputs as QuickInputs} setInputs={setInputs} busy={busy} onRun={run} onCancel={record!.status === 'checked' ? () => {setEditing(false); setInputs(record!.inputs)} : undefined}/>) :
             <ResultsPanel record={record!} selected={selected} onSelect={setSelected} onEdit={() => setEditing(true)} onNew={() => open(null)}/>}
         </aside>
       </div>}
@@ -87,11 +103,12 @@ function edit<K extends keyof QuickInputs>(inputs: QuickInputs, field: K, value:
   return {...inputs, [field]: value, assumed: inputs.assumed.filter(f => !key.includes(f)), entered: Array.from(new Set([...inputs.entered, ...key]))};
 }
 
-function UploadStep({connected, visionModel, busy, onRead, onDemoReview, onDemoSample}: {
-  connected: boolean; visionModel?: string | null; busy: string;
+function UploadStep({initial, connected, visionModel, busy, onRead, onDemoReview, onDemoSample}: {
+  initial: Checkable; connected: boolean; visionModel?: string | null; busy: string;
   onRead: (label: string, fn: () => Promise<QuickCheckRecord>) => void; onDemoReview: (discipline: Discipline) => void; onDemoSample: (discipline: 'fire' | 'plumbing') => void;
 }) {
   const [file, setFile] = useState<File | null>(null), [page, setPage] = useState(1), [error, setError] = useState('');
+  const [discipline, setDiscipline] = useState<Checkable>(initial), copy = COPY[discipline];
   const pdf = file?.type === 'application/pdf' || file?.name.toLowerCase().endsWith('.pdf');
   const reader = visionModel || 'Gemini';
   const read = () => {
@@ -102,15 +119,15 @@ function UploadStep({connected, visionModel, busy, onRead, onDemoReview, onDemoS
     setError('');
     onRead(`Reading ${file.name} with ${reader}. This usually takes 10–30 seconds.`, async () => {
       const data = await new Promise<string>((resolve, reject) => {const r = new FileReader(); r.onload = () => resolve(String(r.result)); r.onerror = () => reject(new Error('This file could not be read. Choose it again.')); r.readAsDataURL(file)});
-      return api<QuickCheckRecord>('/quick-checks', {discipline: 'structure', page: pdf ? page - 1 : 0, attachment: {name: file.name, mime_type: mime, data: data.slice(data.indexOf(',') + 1)}});
+      return api<QuickCheckRecord>('/quick-checks', {discipline, page: pdf ? page - 1 : 0, attachment: {name: file.name, mime_type: mime, data: data.slice(data.indexOf(',') + 1)}});
     });
   };
-  const sample = () => onRead(connected ? `Reading the sample sheet with ${reader}…` : 'Opening the sample sheet…', () => api<QuickCheckRecord>('/quick-checks/sample', {discipline: 'structure', live: connected}));
+  const sample = () => onRead(connected ? `Reading the sample sheet with ${reader}…` : 'Opening the sample sheet…', () => api<QuickCheckRecord>('/quick-checks/sample', {discipline, live: connected}));
   return <div className="quick-upload">
     <div className="quick-upload-copy">
-      <span className="eyebrow">QUICK CHECK · STRUCTURE</span>
+      <span className="eyebrow">{copy.eyebrow}</span>
       <h1>Check one drawing on its own.</h1>
-      <p>Upload a roof framing plan. Gemini reads the grid, columns, member sizes and loads off the sheet. You confirm what it read, then the structural screen runs on exactly that, and every finding is pinned to the drawing.</p>
+      <p>{copy.body}</p>
       <ul className="quick-promises">
         <li><CheckCircle2 size={15}/> Your projects and the demo are never changed.</li>
         <li><CheckCircle2 size={15}/> Values not on the sheet stay missing. Nothing is borrowed from another project.</li>
@@ -119,24 +136,24 @@ function UploadStep({connected, visionModel, busy, onRead, onDemoReview, onDemoS
     </div>
     <div className="quick-upload-card">
       <div className="quick-disciplines" role="radiogroup" aria-label="System to check">
-        <button role="radio" aria-checked="true" className="active"><Columns3 size={15}/> Structure</button>
+        {READY.map(d => <button key={d.id} role="radio" aria-checked={discipline === d.id} className={discipline === d.id ? 'active' : ''} disabled={!!busy} onClick={() => setDiscipline(d.id)}><d.icon size={15}/> {d.label}</button>)}
         {OTHER.map(d => <button key={d.id} role="radio" aria-checked="false" disabled title="Coming next"><d.icon size={15}/> {d.label}</button>)}
       </div>
-      <label className="file-drop"><Upload size={25}/><strong>{file?.name || 'Choose a framing plan'}</strong><span>PDF, PNG, JPEG or WebP · one sheet · up to 8 MB</span>
+      <label className="file-drop"><Upload size={25}/><strong>{file?.name || copy.file}</strong><span>PDF, PNG, JPEG or WebP · one sheet · up to 8 MB</span>
         <input aria-label="Drawing file" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp" disabled={!!busy} onChange={e => {setFile(e.target.files?.[0] || null); setError(''); setPage(1)}}/></label>
-      {pdf && <Field label="PDF page with the framing plan"><input type="number" min={1} max={500} value={page} onChange={e => setPage(Math.max(1, Number(e.target.value) || 1))}/></Field>}
+      {pdf && <Field label={copy.page}><input type="number" min={1} max={500} value={page} onChange={e => setPage(Math.max(1, Number(e.target.value) || 1))}/></Field>}
       {error && <p className="inline-error" role="alert">{error}</p>}
       {!connected && <p className="helper">No AI provider is connected on this server, so your own drawings cannot be read. The sample sheet works with a recorded reading.</p>}
       <button className="button primary full" disabled={!!busy || !file || !connected} onClick={read}>{busy ? <><Loader2 size={14} className="spin"/> {busy}</> : <><ScanSearch size={15}/> Read drawing with {reader}</>}</button>
-      <button className="button secondary full" disabled={!!busy} onClick={sample}><Play size={14}/> Try the sample framing plan</button>
-      <p className="helper">Fire, plumbing and electrical sheets need a floor-plan reader and are coming next. Until then, try them on the demo project, as a candidate that leaves its saved design unchanged: the <button className="text-button inline" onClick={() => onDemoSample('fire')}>fire sample</button>, the <button className="text-button inline" onClick={() => onDemoSample('plumbing')}>plumbing sample</button> or the <button className="text-button inline" onClick={() => onDemoReview('electrical')}>electrical review</button>.</p>
+      <button className="button secondary full" disabled={!!busy} onClick={sample}><Play size={14}/> {copy.sample}</button>
+      <p className="helper">Plumbing and electrical sheets need their own readers and are coming next. Until then, try them on the demo project, as a candidate that leaves its saved design unchanged: the <button className="text-button inline" onClick={() => onDemoSample('plumbing')}>plumbing sample</button> or the <button className="text-button inline" onClick={() => onDemoReview('electrical')}>electrical review</button>.</p>
     </div>
   </div>;
 }
 
 /** The sheet with what was read (confirm step) or the findings (results step) drawn in the image's own pixel space. */
 function SheetView({record, inputs, results, selected, onSelect, onToggleColumn}: {
-  record: QuickCheckRecord; inputs: QuickInputs; results: QuickCheckRecord['results']; selected: string[];
+  record: StructureRecord; inputs: QuickInputs; results: QuickCheckRecord['results']; selected: string[];
   onSelect: (id: string) => void; onToggleColumn?: (i: number, j: number) => void;
 }) {
   const t = record.transform;
@@ -202,24 +219,37 @@ function SheetView({record, inputs, results, selected, onSelect, onToggleColumn}
   </div>;
 }
 
-function Source({inputs, field, value}: {inputs: QuickInputs; field: string; value?: unknown}) {
+export function Source({inputs, field, value}: {inputs: {assumed: string[]; entered: string[]}; field: string; value?: unknown}) {
   const state = inputs.entered.includes(field) ? 'entered' : inputs.assumed.includes(field) ? 'assumed' : value === null ? 'missing' : 'read';
   return <span className={'source-chip ' + state}>{{entered: 'Entered', assumed: 'Assumed', missing: 'Missing', read: 'From sheet'}[state]}</span>;
 }
 
-function NumberInput({label, unit, value, onChange, hint, step = 0.01}: {label: string; unit: string; value: number | null; onChange: (v: number | null) => void; hint?: ReactNode; step?: number}) {
+export function NumberInput({label, unit, value, onChange, hint, step = 0.01}: {label: string; unit: string; value: number | null; onChange: (v: number | null) => void; hint?: ReactNode; step?: number}) {
   const [text, setText] = useState(value == null ? '' : String(value));
   useEffect(() => {if ((text === '' ? null : Number(text)) !== value) setText(value == null ? '' : String(value))}, [value]);
   return <label className="field quick-field"><span>{label} {hint}</span><div className="unit-input"><input type="number" step={step} min={0} value={text} placeholder="Not on the sheet"
     onChange={e => {setText(e.target.value); const v = e.target.value === '' ? null : Number(e.target.value); if (v === null || Number.isFinite(v)) onChange(v)}}/><em>{unit}</em></div></label>;
 }
 
+/** Counts of what was read, assumed and missing, the notes that need attention, and the rest behind a disclosure. */
+export function NoteSummary({notes}: {notes: Note[]}) {
+  const count = (level: Level) => notes.filter(n => n.level === level).length;
+  const problems = notes.filter(n => ['unsupported', 'conflict', 'missing'].includes(n.level));
+  return <>
+    <div className="read-summary">
+      <span className="source-chip read">{count('read')} read</span><span className="source-chip assumed">{count('assumed')} assumed</span><span className="source-chip missing">{count('missing')} missing</span>
+      {count('conflict') + count('unsupported') > 0 && <span className="source-chip conflict">{count('conflict') + count('unsupported')} to resolve</span>}
+    </div>
+    {problems.length > 0 && <ul className="note-list">{problems.map((n, i) => <li key={i} className={n.level}><AlertTriangle size={13}/><span>{n.message}</span></li>)}</ul>}
+    <details className="note-details"><summary>Assumptions and values read ({count('read') + count('assumed')})</summary>
+      <ul className="note-list">{notes.filter(n => ['read', 'assumed'].includes(n.level)).map((n, i) => <li key={i} className={n.level}>{n.level === 'read' ? <CheckCircle2 size={13}/> : <Pencil size={13}/>}<span>{n.message}</span></li>)}</ul></details>
+  </>;
+}
+
 function ConfirmPanel({record, inputs, setInputs, busy, onRun, onCancel}: {
-  record: QuickCheckRecord; inputs: QuickInputs; setInputs: (i: QuickInputs) => void; busy: string; onRun: () => void; onCancel?: () => void;
+  record: StructureRecord; inputs: QuickInputs; setInputs: (i: QuickInputs) => void; busy: string; onRun: () => void; onCancel?: () => void;
 }) {
   const set = <K extends keyof QuickInputs>(f: K, v: QuickInputs[K]) => setInputs(edit(inputs, f, v));
-  const count = (level: Level) => record.notes.filter(n => n.level === level).length;
-  const problems = record.notes.filter(n => ['unsupported', 'conflict', 'missing'].includes(n.level));
   const spacing = (axis: 'grid_x' | 'grid_y', k: number, v: number | null) => {
     const g = inputs[axis]; const bays = g.slice(1).map((p, i) => p - g[i]); bays[k] = v ?? 0;
     set(axis, bays.reduce((acc, b) => [...acc, Math.round((acc[acc.length - 1] + b) * 1000) / 1000], [0]));
@@ -228,13 +258,7 @@ function ConfirmPanel({record, inputs, setInputs, busy, onRun, onCancel}: {
   return <div className="confirm-panel">
     <h2>Confirm what was read</h2>
     <p className="quiet">{record.extraction.title || record.source.name}. Correct anything that is wrong. Nothing is calculated until you run the check.</p>
-    <div className="read-summary">
-      <span className="source-chip read">{count('read')} read</span><span className="source-chip assumed">{count('assumed')} assumed</span><span className="source-chip missing">{count('missing')} missing</span>
-      {count('conflict') + count('unsupported') > 0 && <span className="source-chip conflict">{count('conflict') + count('unsupported')} to resolve</span>}
-    </div>
-    {problems.length > 0 && <ul className="note-list">{problems.map((n, i) => <li key={i} className={n.level}><AlertTriangle size={13}/><span>{n.message}</span></li>)}</ul>}
-    <details className="note-details"><summary>Assumptions and values read ({count('read') + count('assumed')})</summary>
-      <ul className="note-list">{record.notes.filter(n => ['read', 'assumed'].includes(n.level)).map((n, i) => <li key={i} className={n.level}>{n.level === 'read' ? <CheckCircle2 size={13}/> : <Pencil size={13}/>}<span>{n.message}</span></li>)}</ul></details>
+    <NoteSummary notes={record.notes}/>
 
     <h3 className="form-head">Grid <Source inputs={inputs} field="grid_x"/></h3>
     <div className="bay-row"><span>{inputs.grid_x_labels[0]}–{inputs.grid_x_labels[inputs.grid_x_labels.length - 1]}</span>{inputs.grid_x.slice(1).map((p, k) => <input key={k} aria-label={`Bay ${inputs.grid_x_labels[k]}–${inputs.grid_x_labels[k + 1]} (m)`} type="number" step={0.05} min={0.5} value={Math.round((p - inputs.grid_x[k]) * 1000) / 1000} onChange={e => spacing('grid_x', k, Number(e.target.value))}/>)}<em>m</em></div>
@@ -284,6 +308,12 @@ function ConfirmPanel({record, inputs, setInputs, busy, onRun, onCancel}: {
 function locatable(check: Check, r: Result) {
   return check.objects.find(id => id.startsWith('beam-') || id.startsWith('foundation-') || r.structure.foundations.some(f => f.column_id === id));
 }
+function fireTarget(check: Check, r: Result) {
+  const id = FIRE_TARGET[check.rule_id];
+  if (id === 'travel' && r.fire?.enabled && !r.fire.travel.critical_path.length) return undefined;
+  if (id === 'reach' && r.fire?.enabled && !r.fire.extinguishers.critical_path.length) return undefined;
+  return id;
+}
 
 function ResultsPanel({record, selected, onSelect, onEdit, onNew}: {record: QuickCheckRecord; selected: string[]; onSelect: (ids: string[]) => void; onEdit: () => void; onNew: () => void}) {
   const r = record.results!;
@@ -292,12 +322,13 @@ function ResultsPanel({record, selected, onSelect, onEdit, onNew}: {record: Quic
     for (const c of r.checks) {const k = c.status + '|' + c.rule_id; map.set(k, [...(map.get(k) || []), c])}
     return [...map.entries()].sort(([a], [b]) => ORDER.indexOf(a.split('|')[0]) - ORDER.indexOf(b.split('|')[0]));
   }, [r]);
-  const target = (c: Check) => {const id = locatable(c, r); if (!id) return undefined; const f = r.structure.foundations.find(f => f.column_id === id); return f ? f.id : id};
-  const assumed = Array.from(new Set(record.inputs.assumed.map(f => LABELS[f] || f)));
+  const fire = record.discipline === 'fire';
+  const target = (c: Check) => {if (fire) return fireTarget(c, r); const id = locatable(c, r); if (!id) return undefined; const f = r.structure.foundations.find(f => f.column_id === id); return f ? f.id : id};
+  const assumed = Array.from(new Set(record.inputs.assumed.map(f => fire ? fireLabel(f) : LABELS[f] || f)));
   // A selection made on the drawing brings its finding into view in the panel.
   useEffect(() => {document.querySelector('.finding-targets .target.on')?.scrollIntoView({block: 'nearest', behavior: 'smooth'})}, [selected.join()]);
   return <div className="results-panel">
-    <div className="results-head"><h2>Structural findings</h2><span className="mono quiet">{record.id}</span></div>
+    <div className="results-head"><h2>{fire ? 'Fire and egress findings' : 'Structural findings'}</h2><span className="mono quiet">{record.id}</span></div>
     <div className="result-counts">
       <span className={'count fail' + (r.summary.fail ? '' : ' zero')}><strong>{r.summary.fail}</strong> fail</span><span className="count missing_input"><strong>{r.summary.missing_input}</strong> missing input</span>
       <span className="count pass"><strong>{r.summary.pass}</strong> pass</span><span className="count unsupported"><strong>{r.summary.unsupported}</strong> not evaluated</span>
@@ -305,7 +336,7 @@ function ResultsPanel({record, selected, onSelect, onEdit, onNew}: {record: Quic
     {assumed.length > 0 && <p className="quick-assumed"><Pencil size={13}/> Uses assumed values for {assumed.join(', ').toLowerCase()}. <button className="text-button inline" onClick={onEdit}>Confirm them</button></p>}
     {groups.map(([key, checks]) => {const [status, rule] = key.split('|'); const first = checks[0];
       return <article key={key} className={'finding-group ' + status}>
-        <div className="review-finding-top"><Status status={status}/><strong>{RULES[rule] || rule}</strong>{checks.length > 1 && <span className="quiet">× {checks.length}</span>}<span className="mono quiet">{rule}</span></div>
+        <div className="review-finding-top"><Status status={status}/><strong>{(fire ? FIRE_RULES : RULES)[rule] || rule}</strong>{checks.length > 1 && <span className="quiet">× {checks.length}</span>}<span className="mono quiet">{rule}</span></div>
         <p>{first.evidence}</p>
         <div className="finding-targets">
           {checks.map(c => {const id = target(c); return id ? <button key={c.id} className={'target' + (selected.includes(id) ? ' on' : '')} onClick={() => onSelect([id])}><MapPin size={11}/>{label(id, record)}</button> : null})}
@@ -313,18 +344,20 @@ function ResultsPanel({record, selected, onSelect, onEdit, onNew}: {record: Quic
         <details><summary>Calculation inputs</summary>{checks.slice(0, 6).map(c => <pre key={c.id}>{c.evidence}{'\n'}{JSON.stringify(c.inputs, null, 1)}</pre>)}{checks.length > 6 && <small className="quiet">and {checks.length - 6} more like these</small>}</details>
       </article>})}
     {r.coverage && <div className="coverage">
+      {fire && r.fire?.enabled && <p className="helper tight">{r.fire.gross_area_m2.toFixed(1)} m² gross · {r.fire.occupant_load} occupants · {r.fire.exits.length} exit{r.fire.exits.length === 1 ? '' : 's'}</p>}
       <h3>Checked from this sheet</h3><ul>{r.coverage.checked.map(c => <li key={c}><CheckCircle2 size={13}/>{c}</li>)}</ul>
       <h3>Not checked</h3><ul>{r.coverage.not_checked.map(c => <li key={c.item}><span><strong>{c.item}.</strong> {c.reason}</span></li>)}</ul>
     </div>}
     <div className="run-bar">
       <button className="button secondary full" onClick={() => {onEdit(); document.querySelector('.quick-page')?.scrollTo({top: 0})}}><Pencil size={14}/> Edit inputs and re-run</button>
       <button className="button secondary full" onClick={onNew}><RefreshCw size={14}/> Check another sheet</button>
-      <p className="helper tight">Preliminary screening only. A licensed civil or structural engineer must review the design before construction or permit submission.</p>
+      <p className="helper tight">{fire ? 'Preliminary screening only. Fire safety plans need the BFP\'s evaluation (FSEC) and review by the responsible licensed professional before permit submission.' : 'Preliminary screening only. A licensed civil or structural engineer must review the design before construction or permit submission.'}</p>
     </div>
   </div>;
 }
 
 function label(id: string, record: QuickCheckRecord) {
+  if (record.discipline === 'fire') return FIRE_TARGET_LABEL[id] || id;
   const i = record.inputs, m = record.model!, r = record.results!;
   const gl = (x: number, axis: 'x' | 'y') => {const g = axis === 'x' ? i.grid_x : i.grid_y, l = axis === 'x' ? i.grid_x_labels : i.grid_y_labels; const k = g.findIndex(v => Math.abs(v - x) < 1e-6); return k >= 0 ? l[k] : `${x} m`};
   const beam = r.structure.beams.find(b => b.id === id);

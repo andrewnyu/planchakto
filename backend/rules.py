@@ -54,7 +54,9 @@ RULES=[
 ]
 
 STRUCTURAL={'SLS','ELASTIC','BEARING','WIND','SEISMIC-V','DRIFT','COLUMN','FRAME-MEMBER','FOOT-LATERAL'}
-def in_scope(rule,scope):return scope is None or rule=='PH-CODE' or (scope=='structure' and rule in STRUCTURAL)
+FIRE={'FIRE-OCCLOAD','FIRE-EXITS','FIRE-TRAVEL','FIRE-DEADEND','FIRE-COMMON','FIRE-CAPACITY','FIRE-CORRIDOR','FIRE-SPRINKLER','FIRE-ALARM','FIRE-EMLIGHT','FIRE-SIGNS','FIRE-EXT','FIRE-SCOPE'}
+SCOPED={'structure':STRUCTURAL,'fire':FIRE}
+def in_scope(rule,scope):return scope is None or rule=='PH-CODE' or rule in SCOPED.get(scope,())
 def evaluate_rules(b,structure,layout,routing,fitout,rev,solar=None,fire=None,lateral=None,scope=None):
     results=[]
     def add(rule,status,objects,evidence,inputs=None):
@@ -79,7 +81,7 @@ def evaluate_rules(b,structure,layout,routing,fitout,rev,solar=None,fire=None,la
     if lateral and lateral.get('enabled'):
         for c in lateral['checks']:add(c['rule'],c['status'],c['objects'],f"{c['evidence']} [{c['clause']}]" if c['clause'] else c['evidence'],c['inputs'])
     add('PH-CODE','unsupported',[b.id],'No Philippine statutory rules are verified. This is preliminary planning and review support, requiring appropriate professional review for construction and approval.')
-    gaps=(['Torsion, orthogonal effects, P-Δ, irregular and multi-storey buildings, dynamic analysis','Connections, base plates and anchor bolts','Foundation settlement, punching shear and reinforcement'] if lateral and lateral.get('enabled') else
+    gaps=[] if scope=='fire' else (['Torsion, orthogonal effects, P-Δ, irregular and multi-storey buildings, dynamic analysis','Connections, base plates and anchor bolts','Foundation settlement, punching shear and reinforcement'] if lateral and lateral.get('enabled') else
           ['Whole-building stability, wind and seismic','Steel column buckling and connections','Foundation uplift, eccentric contact, settlement, sliding, overturning, punching and reinforcement'])
     # A scoped check lists only its own discipline's gaps; other disciplines appear once in the result's coverage.
     for name in gaps+([] if scope else ['Electrical protection, conductor sizing and voltage drop','Plumbing hydraulic sizing, venting and pipe diameter adequacy']):

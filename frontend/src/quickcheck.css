@@ -107,6 +107,44 @@
 .coverage ul{list-style:none;padding:0;margin:0;display:grid;gap:6px}
 .coverage li{display:flex;gap:7px;font-size:11.5px;line-height:1.5;color:#4c5d50}.coverage li svg{color:var(--pass);flex-shrink:0;margin-top:3px}
 
+/* Fire: rooms, doors and exits read from a floor plan, and the egress paths found on it */
+.quick-page{--exit:#2f7a52;--ext:#c0392b}
+.fp-outline{fill:none;stroke:var(--ink)}
+.fp-room{cursor:pointer;outline:none}
+.fp-room rect{fill:rgba(47,116,128,.06);stroke:var(--read);vector-effect:non-scaling-stroke}
+.fp-room text{fill:var(--read);text-anchor:middle;dominant-baseline:middle;font-weight:600;pointer-events:none}
+.fp-room:hover rect,.fp-room:focus-visible rect{fill:rgba(193,125,75,.14)}
+.fp-room.selected rect{fill:rgba(235,165,103,.28);stroke:#c17d4b}
+.fp-room.unreachable rect{fill:rgba(191,86,54,.16);stroke:var(--fail)}.fp-room.unreachable text{fill:var(--fail)}
+.fp-door{stroke:#eba567;stroke-linecap:round;pointer-events:none}
+.fp-exit.read{--s:var(--exit)}
+.fp-exit line:not(.hit):not(.halo){stroke-linecap:round}
+.fp-ext circle{fill:var(--ext);stroke:#fff;pointer-events:none}
+.finding.fp-travel circle,.finding.fp-reach circle{fill:var(--s)}
+.finding.fp-reach line,.finding.fp-reach polyline:not(.hit):not(.halo){stroke:var(--s);opacity:.8}
+.finding polyline:not(.hit):not(.halo){stroke:var(--s);stroke-linecap:round;stroke-linejoin:round}
+.finding polyline.hit{stroke:transparent}.finding polyline.halo{fill:none;stroke-linecap:round}
+.lg.exit{--c:var(--exit)}.lg.ext{--c:var(--ext)}
+.choice-list{display:grid;gap:6px}
+.choice-list button{display:grid;justify-items:start;justify-content:stretch;width:100%;gap:1px;text-align:left;padding:8px 10px;border:1px solid #dce2d6;border-radius:6px;background:#fff}
+.choice-list button strong{font-size:12px;font-weight:600}.choice-list button span{font-size:11px;color:var(--muted)}
+.choice-list button:hover{border-color:#c17d4b}
+.choice-list button.on{border-color:#345d49;background:#eef4ec;box-shadow:inset 3px 0 0 #345d49}
+.check-row{display:flex;align-items:center;gap:8px;font-size:12px;margin-bottom:8px}.check-row .source-chip{margin-left:auto}
+.fp-table{display:grid;gap:4px 5px;font-size:10px;color:var(--muted);margin-bottom:4px}
+.fp-table.rooms{grid-template-columns:minmax(0,1fr) repeat(4,48px) 22px}
+.fp-table.exits{grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) minmax(0,1.3fr) 22px}
+.fp-row{display:contents}
+.fp-row input,.fp-row select{padding:5px 6px;font-size:11px}
+.fp-row.on input{border-color:#c17d4b;background:#fdf6ef}
+.fp-row .icon-button{width:22px;height:28px;margin:0}
+.with-chip{display:flex;align-items:center;gap:4px;min-width:0}.with-chip .source-chip{padding:2px 5px}
+.fp-list{list-style:none;padding:0;margin:0 0 6px;display:grid;gap:3px}
+.fp-list li{display:flex;align-items:center;gap:6px;font-size:11.5px;padding:3px 0 3px 8px;border-left:2px solid #eba567}
+.fp-list li.bad{border-color:var(--fail);color:#8a3f24}
+.fp-list li .icon-button{width:22px;height:22px;margin-left:auto}
+.fp-add{display:grid;grid-template-columns:1fr 1fr auto;gap:5px}.fp-add select{padding:5px 6px;font-size:11px}.fp-add .button{padding:5px 9px;font-size:11px}
+
 @media (max-width:980px){
  .quick-upload{grid-template-columns:1fr}
  .quick-layout{grid-template-columns:1fr;padding:12px 16px 24px}

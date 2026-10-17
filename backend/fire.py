@@ -11,9 +11,10 @@ OCCUPANT_LOAD={'business':(9.3,'10.2.16.1 ¶3.1'),'business_concentrated':(4.6,'
 EXTINGUISHER={'low':('2-A',15,200),'moderate':('3-A',12,100),'high':('4-A',10,75)}  # 10.2.6.9 Table 7: rating, max travel m, max area m²
 RATING={'2-A':2,'3-A':3,'4-A':4}
 
-def exit_segments(b:Building):
-    """Exterior exits as axis-aligned segments on the building perimeter."""
-    segs=[{'id':d['id'],'a':(0.,d['y']),'b':(0.,d['y']+d['width']),'width':d['width'],'wall':'west'} for d in openings(b) if d['kind']=='entry']
+def exit_segments(b:Building,drawn=False):
+    """Exterior exits as axis-aligned segments on the building perimeter. `drawn`: only the exits in b.fire.exits
+    (a floor plan read in Quick check), without the planning model's implied west corridor entrance."""
+    segs=[] if drawn else [{'id':d['id'],'a':(0.,d['y']),'b':(0.,d['y']+d['width']),'width':d['width'],'wall':'west'} for d in openings(b) if d['kind']=='entry']
     for e in b.fire.exits:
         a,c={'west':((0,e.offset),(0,e.offset+e.width)),'east':((b.width,e.offset),(b.width,e.offset+e.width)),
              'south':((e.offset,0),(e.offset+e.width,0)),'north':((e.offset,b.depth),(e.offset+e.width,b.depth))}[e.wall]
@@ -21,7 +22,7 @@ def exit_segments(b:Building):
     return segs
 
 class Grid:
-    def __init__(self,b:Building):
+    def __init__(self,b:Building,doors=None):
         self.b=b;self.nx=max(1,round(b.width/STEP));self.ny=max(1,round(b.depth/STEP))
         self.room={}
         for i in range(self.nx):
@@ -29,11 +30,17 @@ class Grid:
                 x,y=(i+.5)*STEP,(j+.5)*STEP
                 r=next((r for r in b.rooms if r.x<=x<=r.x+r.w and r.y<=y<=r.y+r.h),None)
                 if r:self.room[(i,j)]=r.id
-        # Interior doors are horizontal segments on corridor walls (see geometry.openings).
-        self.doors=[(d['x'],d['x']+d['width'],d['y']) for d in openings(b) if d['kind']=='door']
+        # Interior doors are horizontal segments on corridor walls (see geometry.openings), unless a drawn floor plan
+        # supplies its own doors: axis-aligned segments {'a':(x,y),'b':(x,y)} on any wall between two rooms.
+        self.drawn=doors
+        self.doors=[(d['x'],d['x']+d['width'],d['y']) for d in openings(b) if d['kind']=='door'] if doors is None else []
     def center(self,c):return ((c[0]+.5)*STEP,(c[1]+.5)*STEP)
     def passable(self,c,n):
         if self.room[c]==self.room[n]:return True
+        if self.drawn is not None:
+            # Room edges from a drawing need not sit on the 0.25 m grid, so a door matches the cell boundary within one step.
+            k=0 if c[0]!=n[0] else 1;wall=max(c[k],n[k])*STEP;along=(c[1-k]+.5)*STEP
+            return any(abs(d['a'][k]-d['b'][k])<1e-9 and abs(d['a'][k]-wall)<=STEP+1e-9 and min(d['a'][1-k],d['b'][1-k])<=along<=max(d['a'][1-k],d['b'][1-k]) for d in self.drawn)
         if c[0]!=n[0]:return False  # interior doors are only modeled on horizontal walls
         y=max(c[1],n[1])*STEP;x=(c[0]+.5)*STEP
         return any(abs(y-dy)<1e-6 and x0<=x<=x1 for x0,x1,dy in self.doors)
@@ -84,10 +91,11 @@ def dead_end(b,segs):
         if length>worst:worst,where=length,r.id
     return worst,where
 
-def analyze_fire(b:Building):
+def analyze_fire(b:Building,doors=None):
+    """`doors`: interior doors drawn on a floor plan (Quick check). None keeps the planning model's corridor doors."""
     f=b.fire
     if not f.enabled:return {'enabled':False}
-    grid=Grid(b);segs=exit_segments(b);checks=[]
+    grid=Grid(b,doors);segs=exit_segments(b,doors is not None);checks=[]
     def add(rule,status,evidence,clause,inputs=None):checks.append({'rule':rule,'status':status,'evidence':evidence,'clause':clause,'inputs':inputs or {}})
     gfa=b.width*b.depth;factor,load_clause=OCCUPANT_LOAD[f.occupancy];load=math.ceil(round(gfa/factor,9))
     merc=f.occupancy=='mercantile';business=not merc
@@ -100,13 +108,15 @@ def analyze_fire(b:Building):
     unreachable=sorted({grid.room[c] for c,(d,_) in nearest.items() if d==math.inf})
     critical=path(grid,runs[nearest[worst_cell][1]][1],worst_cell) if worst_cell and travel<math.inf else []
     # Common path: shared prefix of the routes to the two nearest exits (tree-metric approximation).
-    common=travel
-    if len(runs)>=2:
+    # Unreachable floor already fails FIRE-TRAVEL; the common path is measured over the floor that reaches an exit.
+    common=max((d for d,_ in nearest.values() if d<math.inf),default=math.inf)
+    if len(runs)>=2 and common<math.inf:
         between=[[min((runs[i][0].get(c,math.inf) for c in grid.exit_sources(segs[j])),default=math.inf) for j in range(len(runs))] for i in range(len(runs))]
         common=0.
         for c in grid.room:
             ds=sorted((run[0].get(c,math.inf),k) for k,run in enumerate(runs))
             (d1,a),(d2,k2)=ds[0],ds[1]
+            if d1==math.inf:continue
             shared=d1 if d2==math.inf else min(d1,max(0.,(d1+d2-between[a][k2])/2))
             common=max(common,shared)
     de,de_room=dead_end(b,segs)
@@ -126,7 +136,8 @@ def analyze_fire(b:Building):
         dl=15 if f.sprinklered else 6
         add('FIRE-DEADEND','pass' if de<=dl+1e-9 else 'fail',f'Longest dead-end corridor {de:.1f} m'+(f' ({de_room})' if de_room else '')+f' vs {dl} m','RIRR 10.2.16.2 ¶5.2.a (15 m sprinklered) / ¶5.2.b (6 m)',{'dead_end_m':de})
         cl=30 if f.sprinklered or load<=30 else 23
-        add('FIRE-COMMON','pass' if common<=cl+1e-9 else 'fail',f'Common path of travel {common:.1f} m vs {cl} m'+(' (single tenant, ≤ 30 occupants assumed)' if not f.sprinklered and load<=30 else ''),'RIRR 10.2.16.2 ¶5.3.a/b (30 m) / ¶5.3.c (23 m)',{'common_path_m':common})
+        if common==math.inf:add('FIRE-COMMON','fail','No modeled path reaches an exit, so the common path cannot be measured','RIRR 10.2.16.2 ¶5.3.a/b (30 m) / ¶5.3.c (23 m)')
+        else:add('FIRE-COMMON','pass' if common<=cl+1e-9 else 'fail',f'Common path of travel {common:.1f} m vs {cl} m'+(' (single tenant, ≤ 30 occupants assumed)' if not f.sprinklered and load<=30 else ''),'RIRR 10.2.16.2 ¶5.3.a/b (30 m) / ¶5.3.c (23 m)',{'common_path_m':common})
     else:
         add('FIRE-DEADEND','pass' if de<=6+1e-9 else 'fail',f'Longest dead-end corridor {de:.1f} m vs 6 m','RIRR 10.2.5.2 ¶I (general, 6 m)',{'dead_end_m':de})
         add('FIRE-COMMON','unsupported','Division 15 states no general common-path limit for this case; not evaluated','RIRR 10.2.15.2 ¶4.2')
@@ -166,7 +177,7 @@ def analyze_fire(b:Building):
     for name,clause in [('Standpipes','10.2.6.8'),('Construction, compartmentation and fire-resistance ratings','10.2.6.1'),('Interior finish','10.2.6.4'),('Hazardous areas and segregation','10.2.6.10'),('FSEC / building plan evaluation by the BFP','Rule 9')]:
         add('FIRE-SCOPE','unsupported',f'{name}: not evaluated',f'RIRR {clause}')
     return {'enabled':True,'occupancy':f.occupancy,'mercantile_class':klass,'gross_area_m2':gfa,'occupant_load':load,'exits':[{**s,'a':list(s['a']),'b':list(s['b'])} for s in segs],
-            'travel':{'max_m':travel if travel<math.inf else None,'critical_path':critical,'common_path_m':common if common<math.inf else None,'dead_end_m':de},
+            'travel':{'max_m':travel if travel<math.inf else None,'critical_path':critical,'common_path_m':common if common<math.inf else None,'dead_end_m':de,**({'unreachable':unreachable} if unreachable else {})},
             'extinguishers':{'max_travel_m':ext_travel if ext_travel<math.inf else None,'critical_path':ext_path,'reach_m':reach,'min_rating':rating},
-            'checks':checks,'source':SOURCE,
+            'checks':checks,'source':SOURCE,**({'doors':doors} if doors is not None else {}),
             'scope':'Single-storey egress on a 0.25 m grid through modeled doors (furniture and columns ignored), occupant load, exits, travel, dead ends, common path, exit capacity, and sprinkler/alarm/lighting/sign/extinguisher triggers for business and mercantile occupancies.'}
