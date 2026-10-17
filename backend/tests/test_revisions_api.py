@@ -227,14 +227,18 @@ def fake_gemini(monkeypatch,replies):
     monkeypatch.setenv('GOOGLE_CLOUD_PROJECT','p');monkeypatch.setenv('GEMINI_MODEL','flash');monkeypatch.setenv('GEMINI_VISION_MODEL','pro')
     return calls
 
+# The 12 × 9 m demo drawn at 80 page units per metre from (100, 100), with the kitchen (x 6–9) and bathroom (x 9–12) exchanged.
+box=lambda y0,x0,y1,x1:[[y0,x0],[y0,x1],[y1,x1],[y1,x0]]
+SWAP_READING={'outline':box(100,100,820,1060),'width':12,'depth':9,'spaces':[{'label':'KITCHEN','room_id':'kitchen','corners':box(100,820,420,1060)},{'label':'BATH','room_id':'bath','corners':box(100,580,420,820)}]}
 def test_sketch_goes_to_vision_model_as_image_part(client,monkeypatch):
     head=client.get('/api/project').json()['state']['head']
-    calls=fake_gemini(monkeypatch,[{'revision_id':head,'action':'edit','explanation':'Swap per sketch','commands':[{'type':'swap_rooms','first':'bath','second':'kitchen'}]},{'revision_id':head,'action':'inspect','explanation':'review'}])
+    calls=fake_gemini(monkeypatch,[SWAP_READING,{'revision_id':head,'action':'inspect','explanation':'review'}])
     r=client.post('/api/ai',json={'revision_id':head,'message':'Arrange like this','attachment':{'mime_type':'image/png','data':PNG,'name':'sketch.png'}})
     assert r.status_code==200 and r.json()['candidate']['label']=='Layout from sketch.png'
+    assert r.json()['interpretation']['commands']==[{'type':'swap_rooms','first':'kitchen','second':'bath'}]
     assert calls[0]['model']=='pro' and len(calls[0]['contents'])==2 and 'hand sketch' in calls[0]['system']
-    assert calls[0]['schema'] is None and '"move_room"' in calls[0]['system']   # schema in the prompt, not constrained decoding
-    assert calls[0]['contents'][0].inline_data.mime_type=='image/png' and 'sketch.png' in calls[0]['contents'][1]
+    assert calls[0]['schema'] is None and '"SketchSpace"' in calls[0]['system']   # schema in the prompt, not constrained decoding
+    assert calls[0]['contents'][0].inline_data.mime_type=='image/png' and '"bath"' in calls[0]['contents'][1]
     assert client.post('/api/ai',json={'revision_id':head,'message':'What fails?'}).status_code==200
     assert calls[1]['model']=='flash' and isinstance(calls[1]['contents'],str)   # text-only stays on the text model
 
@@ -259,7 +263,7 @@ def test_openrouter_sends_image_as_data_url(client,monkeypatch):
     head=client.get('/api/project').json()['state']['head'];sent={}
     class Resp:
         def raise_for_status(self):pass
-        def json(self):return {'choices':[{'message':{'content':json.dumps({'revision_id':head,'action':'clarify','explanation':'unreadable'})}}]}
+        def json(self):return {'choices':[{'message':{'content':json.dumps({'readable':False})}}]}
     import httpx;monkeypatch.setattr(httpx,'post',lambda url,**kw:sent.update(kw['json']) or Resp())
     r=client.post('/api/ai',json={'revision_id':head,'message':'Like this','attachment':{'mime_type':'image/png','data':PNG}})
     assert r.status_code==200 and sent['messages'][1]['content'][1]['image_url']['url'].startswith('data:image/png;base64,')
@@ -267,8 +271,7 @@ def test_openrouter_sends_image_as_data_url(client,monkeypatch):
 def test_drawing_falls_back_to_text_model_when_vision_model_times_out(client,monkeypatch):
     from google.genai import errors
     head=client.get('/api/project').json()['state']['head']
-    reply={'revision_id':head,'action':'clarify','explanation':'unreadable'}
-    calls=fake_gemini(monkeypatch,[None,reply])
+    calls=fake_gemini(monkeypatch,[None,{'readable':False}])
     from google import genai
     Original=genai.Client
     class Flaky(Original):

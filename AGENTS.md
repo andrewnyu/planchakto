@@ -56,7 +56,8 @@ backend/
   fire.py        RA 9514 egress screen; analyze_fire(b, doors=None): drawn interior doors replace the corridor-derived ones
   routing.py · solar.py · geometry.py · quantities.py · layout.py (CP-SAT)
   drawings.py    permit sheet set (A/S/E/P/FP) → PDF + DXF
-  ai.py          provider selection, _gemini/_openrouter calls, assistant AIPlan validation
+  ai.py          provider selection, _gemini/_openrouter calls, assistant AIPlan validation + repair retry + relaxation guards;
+                 sketch edits: typed SketchReading (page corners) → rectify/snap → move_room/swap_rooms
   agent.py · compose.py   new-project design agent (tool loop) and deterministic generator
   quickcheck.py  Quick check pipeline: rasterize → typed sheet reading → deterministic mapping → confirmable inputs → blank Building → scoped compute;
                  structure: StructuralSheet; fire: FireSheet; plumbing/electrical: ServiceSheet with separate prompts and discipline validation
@@ -168,6 +169,11 @@ npm test --prefix frontend
   - Cloud Run deploy, with gzip and year-long caching of hashed assets;
   - **Quick check for structural framing plans** (live eval 3/3 on gemini-3.8-flash);
   - **Quick check for fire on single-storey floor plans** (live eval 3/3 on gemini-3.8-flash).
+- On `main`, not yet pushed or deployed: workspace assistant hardening and the sketch reader, plus `move_room` child re-fit.
+  - Hardening: one repair retry, no self-relaxed requirements, criteria range guards, and recommendations that keep every requirement.
+  - Sketch reader: page corners → rectify and snap; 24/24 live sketch edits had every room within 0.3 m.
+  - Re-fit: fixtures, equipment and furniture follow moved rooms; doors slide clear of columns.
+  - Limitation test, harness and demo video: `artifacts/limits-test/`, `artifacts/video-alaba/` (gitignored).
 - In the current working tree: **limited Quick checks for plumbing and electrical plans** (recorded demo samples, typed service readings, deterministic mapping and explicit one-sheet coverage limits). Unit/integration tests pass; live Gemini eval has not yet been run for these two readers.
 - Deployed: Cloud Run revision `buildgraph-00013` serves `dcd0aec` (structural Quick check). Fire Quick check is on `main` but not yet deployed.
 - Next: multi-sheet coordination and project promotion/retention, then deck and video updates for the Quick check moment ([docs/HACKATHON_DEMO.md](docs/HACKATHON_DEMO.md) has the script).

@@ -376,8 +376,57 @@ def convert(value: float, source: str, target: str)->float:
     if not math.isfinite(value) or source not in units or target not in units or units[source][0]!=units[target][0]: raise ValueError('Invalid value or incompatible units')
     return value*units[source][1]/units[target][1]
 
+def _anchor(v,old,new,size=0.):
+    """A child keeps its gap to the nearer wall when its room changes size; a centred child stays centred."""
+    if abs(old-new)<1e-9:return v
+    lo,hi=v,old-size-v;free=new-size
+    if abs(lo-hi)<=.05 or min(lo,hi)>free/2:v=free/2
+    else:v=lo if lo<hi else free-hi
+    return round(min(max(v,0.),max(free,0.)),3)
+
+def _fits(r,f,x,y,others,doors,cols):
+    """The fit-out screen's rules (geometry.fitout_checks) for one furniture position, in room coordinates, plus clear of columns."""
+    if x<-1e-9 or y-f.clearance<-1e-9 or x+f.w>r.w+1e-9 or y+f.h>r.h+1e-9:return False
+    hit=lambda a,c:min(a[2],c[2])-max(a[0],c[0])>1e-6 and min(a[3],c[3])-max(a[1],c[1])>1e-6
+    body,front=(x,y,x+f.w,y+f.h),(x,y-f.clearance,x+f.w,y)
+    for o in others:
+        ob=(o.dx,o.dy,o.dx+o.w,o.dy+o.h)
+        if hit(body,ob) or hit(front,ob) or hit(body,(o.dx,o.dy-o.clearance,o.dx+o.w,o.dy)):return False
+    for d in doors:
+        sx,sy=d['x']-r.x,d['y']-r.y-(.9 if r.y<d['y'] else 0)
+        if hit(body,(sx,sy,sx+.9,sy+.9)):return False
+    return not any(hit(body,(c.x-r.x-.15,c.y-r.y-.15,c.x-r.x+.15,c.y-r.y+.15)) for c in cols)
+
+def _refit(b,before,placed):
+    """Children store room-relative offsets, so a room that moves or changes size can leave them outside it, in a door swing
+    or on a column. Re-fit only what no longer fits, with the generator's rules; children placed explicitly in the batch win."""
+    from .compose import _clear_point
+    from .geometry import openings
+    moved={r.id:r for r in b.rooms if before.get(r.id,(r.x,r.y,r.w,r.h))!=(r.x,r.y,r.w,r.h)}
+    if not moved:return
+    cols=[c for c in b.columns if c.active]
+    for p in b.fixtures+b.equipment+b.fire.extinguishers:
+        if p.room_id not in moved or p.id in placed:continue
+        r=moved[p.room_id];_,_,w0,h0=before[r.id]
+        p.dx,p.dy=_anchor(p.dx,w0,r.w),_anchor(p.dy,h0,r.h)
+        if not isinstance(p,Extinguisher):p.dx,p.dy=(round(v,3) for v in _clear_point(r.model_dump(),cols,p.dx,p.dy))  # service points stay 0.6 m off columns so routes connect
+    todo=[f for f in b.furniture if f.room_id in moved and f.id not in placed]
+    for f in todo:
+        _,_,w0,h0=before[f.room_id];f.dx,f.dy=_anchor(f.dx,w0,moved[f.room_id].w,f.w),_anchor(f.dy,h0,moved[f.room_id].h,f.h)
+    doors=openings(b)
+    for f in todo:
+        r=moved[f.room_id];others=[o for o in b.furniture if o.room_id==r.id and o.id!=f.id];mine=[d for d in doors if d['room_id']==r.id]
+        if _fits(r,f,f.dx,f.dy,others,mine,cols):continue
+        # Nearest position on a 0.1 m lattice that clears the room's doors, other furniture and columns; if none, leave it for the fit-out screen to report.
+        spots=[(round(i*.1,3),round(f.clearance+j*.1,3)) for i in range(int((r.w-f.w)/.1+1e-9)+1) for j in range(int((r.h-f.h-f.clearance)/.1+1e-9)+1)]
+        spots.sort(key=lambda s:((s[0]-f.dx)**2+(s[1]-f.dy)**2,s[1],s[0]))
+        f.dx,f.dy=next((s for s in spots if _fits(r,f,*s,others,mine,cols)),(f.dx,f.dy))
+
 def apply_commands(model: Building, commands:list[Command]):
     b=model.model_copy(deep=True); invalidated=set()
+    before={r.id:(r.x,r.y,r.w,r.h) for r in b.rooms}
+    placed={c.furniture_id if isinstance(c,MoveFurniture) else c.fixture_id if isinstance(c,MoveFixture) else c.equipment_id if isinstance(c,MoveEquipment) else c.id
+            for c in commands if isinstance(c,MoveFurniture|MoveFixture|MoveEquipment|AddElement)}
     def obj(group,id):
         item=next((v for v in group if v.id==id),None)
         if item is None: raise ValueError(f'Unknown object {id}')
@@ -434,4 +483,5 @@ def apply_commands(model: Building, commands:list[Command]):
         elif isinstance(cmd,SetRoomRequirements):
             if cmd.max_area<cmd.min_area:raise ValueError('Maximum area must be at least minimum area')
             r=obj(b.rooms,cmd.room_id);r.min_area=cmd.min_area;r.max_area=cmd.max_area;r.min_dimension=cmd.min_dimension
+    _refit(b,before,placed)
     return Building.model_validate(b.model_dump()),sorted(invalidated)

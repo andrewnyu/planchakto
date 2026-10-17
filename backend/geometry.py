@@ -36,6 +36,14 @@ def terrain(b:Building):
     complete=abs(covered-footprint.area)<1e-6
     return {'triangles':triangles,'boundary_area':boundary.area,'cut_m3':cut if complete else None,'fill_m3':fill if complete else None,'coverage':covered/footprint.area,'method':'Approximate centroid integration over footprint-clipped survey triangles; no bulking, compaction or retaining works','status':'pass' if complete else 'missing_input'}
 
+def door_x(b,start,end,y):
+    """Doors sit 0.35 m in from the room corner. A moved room can put a grid column in that opening or its corridor
+    approach (0.6 m from the door centre), so slide the door along the shared wall, nearest first with at least a 0.1 m jamb."""
+    cols=[c.x for c in b.columns if c.active and abs(c.y-y)<=.4]
+    clear=lambda x:all(abs(c-(x+.45))>=.6-1e-9 for c in cols)
+    if clear(start+.35):return start+.35
+    options=[x for x in (round(start+.1+i*.05,3) for i in range(int((end-start-1.1)/.05+1e-9)+1)) if clear(x)]
+    return min(options,key=lambda x:(abs(x-start-.35),x)) if options else start+.35
 def openings(b):
     halls=[r for r in b.rooms if r.kind=='corridor'];result=[]
     if not halls:return result
@@ -45,7 +53,8 @@ def openings(b):
         if abs(r.y+r.h-hall.y)<1e-6 or abs(r.y-(hall.y+hall.h))<1e-6:
             start=max(r.x,hall.x);end=min(r.x+r.w,hall.x+hall.w)
             if end-start>=1.1:
-                result.append({'id':f'door-{r.id}','room_id':r.id,'to_room_id':hall.id,'x':start+.35,'y':hall.y if r.y<hall.y else hall.y+hall.h,'width':.9,'height':2.1,'kind':'door'})
+                y=hall.y if r.y<hall.y else hall.y+hall.h
+                result.append({'id':f'door-{r.id}','room_id':r.id,'to_room_id':hall.id,'x':door_x(b,start,end,y),'y':y,'width':.9,'height':2.1,'kind':'door'})
     result.append({'id':'door-entry','room_id':hall.id,'to_room_id':'outside','x':0,'y':hall.y+.15,'width':1.2,'height':2.1,'kind':'entry'})
     return result
 
