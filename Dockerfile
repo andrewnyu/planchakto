@@ -11,6 +11,7 @@ WORKDIR /app
 COPY backend/requirements.lock.txt /app/backend/requirements.lock.txt
 RUN pip install --no-cache-dir -r backend/requirements.lock.txt && useradd --create-home --uid 10001 buildgraph
 COPY backend/ /app/backend/
+COPY examples/quick-check/ /app/examples/quick-check/
 COPY --from=frontend /app/frontend/dist /app/frontend/dist
 RUN mkdir /app/.data && chown -R buildgraph:buildgraph /app/.data
 USER buildgraph

@@ -89,3 +89,16 @@ class GoogleStore(LocalStore):
         # Ordered on one field and filtered here: an equality filter plus order_by would need a composite index.
         docs=self.root.collection('compose_sessions').order_by('updated_at',direction=firestore.Query.DESCENDING).limit(50).stream()
         return next((d.to_dict() for d in docs if d.to_dict().get('status') in statuses),None)
+    # Quick checks: one JSON record and one page image per check in GCS, apart from the revision index.
+    def save_quick_check(self,record):
+        self.bucket.blob(f'{self.workspace}/quick-checks/{record["id"]}.json').upload_from_string(json.dumps(record),content_type='application/json');return record
+    def get_quick_check(self,id):
+        blob=self.bucket.blob(f'{self.workspace}/quick-checks/{id}.json')
+        if not blob.exists():raise KeyError('Quick check not found')
+        return json.loads(blob.download_as_text())
+    def save_quick_check_image(self,id,png:bytes):
+        self.bucket.blob(f'{self.workspace}/quick-checks/{id}.png').upload_from_string(png,content_type='image/png')
+    def get_quick_check_image(self,id)->bytes:
+        blob=self.bucket.blob(f'{self.workspace}/quick-checks/{id}.png')
+        if not blob.exists():raise KeyError('Quick check image not found')
+        return blob.download_as_bytes()

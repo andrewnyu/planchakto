@@ -17,7 +17,7 @@ The progress indicator means “prepared in this model.” It does not mean code
 
 0. Start on the landing page. Point out the two ways in: **Plan a project** (the full planning graph, which this demo follows) and **Check a plan** (a one-system check for existing drawings). Choose **Open the planning graph**.
 1. Open the **Planning** graph. Point out that every card is an entry point and that the status comes from the active revision: available inputs, calculated screens, findings, missing inputs, or an optional/not-screened state.
-2. Choose **Review an existing plan**, leave **Plumbing** selected, then choose **Try a plumbing sample**. This creates a candidate and preserves the accepted project.
+2. Choose **Check a drawing**, then the **plumbing sample** link under the upload card (or **Plumbing on the demo** on the landing page). This creates a candidate on the demo project and preserves its accepted design.
 3. Show the two real route findings on the focused review screen. The plan highlights the plumbing and structure layers; each finding can locate its source element.
 4. Choose **Preview clear routes**. The routing engine recomputes water, drainage, and conduit paths. The plumbing count changes from two findings to zero.
 5. Show **Change since uploaded plan** and **Compare quantities**. In the bundled sample, the clear routes add approximately ₱600 in modeled material cost because the paths are longer. Rates are synthetic demonstration inputs.
@@ -25,7 +25,7 @@ The progress indicator means “prepared in this model.” It does not mean code
 
 ## Optional second moment: fire protection
 
-Quick-check route: choose **Home** in the left rail, then **Fire sample** on the **Check a plan** card. This imports a single-storey office with no fire provisions as a candidate and opens the fire review with four findings. Finish by choosing **Planning graph** to show that a quick check continues into the full plan.
+Landing-page route: choose **Home** in the left rail, then **Fire on the demo** on the **Check a plan** card. This imports a single-storey office with no fire provisions as a candidate and opens the fire review with four findings. Finish by choosing **Planning graph** to show that a quick check continues into the full plan.
 
 Full-plan route:
 
@@ -35,15 +35,26 @@ Full-plan route:
 
 The fire screen is limited to the implemented single-storey business and mercantile family. It does not claim residential fire-code review, FSEC approval, or full building compliance.
 
+## Gemini moment: Quick check a framing plan
+
+This is the clearest visible use of Gemini, and it takes about 40 seconds.
+
+1. On the landing page choose **Structure** on the **Check a plan** card, then **Try the sample framing plan**. With Gemini connected, the sample sheet is read live in about 10 s; without a provider, a recorded reading is used and the page says so.
+2. **Confirm what was read.** The grid, columns and the read notes are drawn over the uploaded sheet. Point out the chips: values *from the sheet*, *assumed* (seismic zone) and *missing* (R, Na, Nv: never on a framing plan, so the seismic checks stay missing input rather than guessed).
+3. **Run structural check.** The interior row of roof beams (RB-4 to RB-6) turns red at about 150% utilization: it carries twice the tributary width of the edge rows on the same RHS 150 section. Select a beam or footing on the drawing to open its finding and calculation inputs.
+4. **Edit inputs and re-run** with RHS 200 × 100 × 6: every beam passes at about 64%. Point out **Not checked**: plumbing clashes, fire and layout need other drawings, so they are listed, never passed.
+
+Say "screen" and "finding"; the page itself states that a licensed engineer must review the design.
+
 ## Upload behavior
 
 | Input | What happens | Review boundary |
 |---|---|---|
-| Native BuildGraph JSON | Schema validation, deterministic recomputation, candidate revision, focused discipline findings | The model's supplied inputs are reviewed within the implemented analytical scope |
-| PDF, PNG, JPEG, WebP | The configured AI provider maps recognizable rooms to the current model and proposes geometry changes | The file is a layout reference. Services, devices, loads, dimensions, and compliance are not inferred |
-| Current model | Opens the chosen discipline immediately | Useful when the plan is already in BuildGraph |
-| Plumbing sample | Imports a bundled model with direct routes as a candidate | A reliable local demo with no AI or network dependency |
-| Fire sample | Imports a bundled office (business occupancy, no provisions) as a candidate | A reliable local demo with no AI or network dependency |
+| Structural framing plan (PDF, PNG, JPEG, WebP) | **Quick check**, in its own workspace. Gemini reads grid, columns, sections and loads with page positions, the user confirms them on the sheet, and the structure-scoped engine runs | Values not on the sheet stay missing or are labelled assumed. Other disciplines are listed as not checked. Projects and the demo are never changed |
+| Fire, plumbing or electrical drawing | Not read yet; the Quick check page says so and offers the samples on the demo project | Floor-plan readers are the next Quick check disciplines |
+| Native BuildGraph JSON | Import from the Site inspector's **Import** dialog: schema validation, recomputation, candidate revision | The model's supplied inputs are reviewed within the implemented analytical scope |
+| Plumbing sample | Imports a bundled model with direct routes as a candidate on the demo | A reliable local demo with no AI or network dependency |
+| Fire sample | Imports a bundled office (business occupancy, no provisions) as a candidate on the demo | A reliable local demo with no AI or network dependency |
 
 ## Presentation choices
 
@@ -59,4 +70,4 @@ The fire screen is limited to the implemented single-storey business and mercant
 ./scripts/dev.sh
 ```
 
-Open `http://127.0.0.1:8011`. The plumbing sample, deterministic calculations, revision comparison, quantities, and exports work without an AI provider. PDF/image interpretation requires a configured provider and should be demonstrated only with a non-sensitive reference drawing the presenter is authorized to send to that provider.
+Open `http://127.0.0.1:8011`. The plumbing sample, deterministic calculations, revision comparison, quantities, and exports work without an AI provider. Reading your own drawings requires a configured provider and should be demonstrated only with a non-sensitive drawing the presenter is authorized to send to that provider.

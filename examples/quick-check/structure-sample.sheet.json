@@ -1,0 +1,231 @@
+{
+ "sheet_kind": "framing_plan",
+ "title": "S-101 Roof framing plan \u2014 Sample warehouse annex",
+ "units": "mm",
+ "storeys": 1,
+ "grid_x": [
+  {
+   "label": "A",
+   "position": 0,
+   "page": 127.8
+  },
+  {
+   "label": "B",
+   "position": 5000,
+   "page": 322.2
+  },
+  {
+   "label": "C",
+   "position": 10000,
+   "page": 516.7
+  },
+  {
+   "label": "D",
+   "position": 15000,
+   "page": 711.1
+  }
+ ],
+ "grid_y": [
+  {
+   "label": "1",
+   "position": 0,
+   "page": 208.3
+  },
+  {
+   "label": "2",
+   "position": 4000,
+   "page": 441.7
+  },
+  {
+   "label": "3",
+   "position": 8000,
+   "page": 675.0
+  }
+ ],
+ "columns": [
+  {
+   "grid": "A-1",
+   "mark": "C1",
+   "point": [
+    208.3,
+    127.8
+   ]
+  },
+  {
+   "grid": "B-1",
+   "mark": "C1",
+   "point": [
+    208.3,
+    322.2
+   ]
+  },
+  {
+   "grid": "C-1",
+   "mark": "C1",
+   "point": [
+    208.3,
+    516.7
+   ]
+  },
+  {
+   "grid": "D-1",
+   "mark": "C1",
+   "point": [
+    208.3,
+    711.1
+   ]
+  },
+  {
+   "grid": "A-2",
+   "mark": "C1",
+   "point": [
+    441.7,
+    127.8
+   ]
+  },
+  {
+   "grid": "B-2",
+   "mark": "C1",
+   "point": [
+    441.7,
+    322.2
+   ]
+  },
+  {
+   "grid": "C-2",
+   "mark": "C1",
+   "point": [
+    441.7,
+    516.7
+   ]
+  },
+  {
+   "grid": "D-2",
+   "mark": "C1",
+   "point": [
+    441.7,
+    711.1
+   ]
+  },
+  {
+   "grid": "A-3",
+   "mark": "C1",
+   "point": [
+    675.0,
+    127.8
+   ]
+  },
+  {
+   "grid": "B-3",
+   "mark": "C1",
+   "point": [
+    675.0,
+    322.2
+   ]
+  },
+  {
+   "grid": "C-3",
+   "mark": "C1",
+   "point": [
+    675.0,
+    516.7
+   ]
+  },
+  {
+   "grid": "D-3",
+   "mark": "C1",
+   "point": [
+    675.0,
+    711.1
+   ]
+  }
+ ],
+ "columns_at_all_intersections": false,
+ "sections": [
+  {
+   "applies_to": "roof_beam",
+   "text": "RHS 150x100x5",
+   "box": [
+    525.8,
+    820.0,
+    545.8,
+    983.3
+   ]
+  },
+  {
+   "applies_to": "girder",
+   "text": "RHS 150x100x5",
+   "box": [
+    570.8,
+    820.0,
+    590.8,
+    983.3
+   ]
+  },
+  {
+   "applies_to": "column",
+   "text": "SHS 150x150x6",
+   "box": [
+    615.8,
+    820.0,
+    635.8,
+    983.3
+   ]
+  },
+  {
+   "applies_to": "footing",
+   "text": "1200 x 1200 x 300 THK",
+   "box": [
+    660.8,
+    820.0,
+    680.8,
+    983.3
+   ]
+  }
+ ],
+ "loads": [
+  {
+   "kind": "dead",
+   "value": 0.65,
+   "unit": "kPa",
+   "text": "ROOF SUPERIMPOSED DEAD LOAD: 0.65 kPa",
+   "box": [
+    165.8,
+    792.2,
+    204.2,
+    983.3
+   ]
+  },
+  {
+   "kind": "live",
+   "value": 0.75,
+   "unit": "kPa",
+   "text": "ROOF LIVE LOAD: 0.75 kPa (NSCP 2015 TABLE 205-3)",
+   "box": [
+    209.2,
+    792.2,
+    247.5,
+    983.3
+   ]
+  },
+  {
+   "kind": "soil",
+   "value": 96,
+   "unit": "kPa",
+   "text": "ALLOWABLE SOIL BEARING: 96 kPa (ASSUMED - VERIFY BY GEOTECHNICAL INVESTIGATION)",
+   "box": [
+    252.5,
+    792.2,
+    308.3,
+    983.3
+   ]
+  }
+ ],
+ "height_m": 3.5,
+ "footing_width_m": 1.2,
+ "footing_thickness_m": 0.3,
+ "outside_supported": [],
+ "unread": [
+  "Seismic design parameters (R, Na, Nv) are not shown on this sheet"
+ ]
+}

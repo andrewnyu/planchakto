@@ -48,7 +48,7 @@ export function Workflow({revision, onStage, onUpload, onReview, onGenerate, bus
   return <div className="content-scroll workflow-page">
     <div className="workflow-intro">
       <div><span className="eyebrow">YOUR PLANNING WORKSPACE</span><h2>One plan. Every step connected.</h2><p>Start anywhere. Open a step to upload, generate or review your design.</p></div>
-      <button className="button primary" onClick={() => onUpload()} disabled={busy}><Upload size={16}/> Review an existing plan</button>
+      <button className="button primary" onClick={() => onUpload()} disabled={busy}><Upload size={16}/> Check a drawing</button>
     </div>
     <div className="workflow-progress">
       <div><GitBranch size={18}/><span><strong>{prepared} of {required} stages prepared</strong><small>{revision.status === 'candidate' ? 'Candidate progress · review before applying' : 'Saved model · progress updates as you edit'}</small></span></div>

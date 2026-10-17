@@ -53,9 +53,12 @@ RULES=[
  make_rule('PH-CODE','Philippine code coverage','code',[],'not evaluated','n/a','Code edition and authoritative rule library unavailable'),
 ]
 
-def evaluate_rules(b,structure,layout,routing,fitout,rev,solar=None,fire=None,lateral=None):
+STRUCTURAL={'SLS','ELASTIC','BEARING','WIND','SEISMIC-V','DRIFT','COLUMN','FRAME-MEMBER','FOOT-LATERAL'}
+def in_scope(rule,scope):return scope is None or rule=='PH-CODE' or (scope=='structure' and rule in STRUCTURAL)
+def evaluate_rules(b,structure,layout,routing,fitout,rev,solar=None,fire=None,lateral=None,scope=None):
     results=[]
     def add(rule,status,objects,evidence,inputs=None):
+        if not in_scope(rule,scope):return
         results.append({'id':f'{rule}-{len(results)}','rule_id':rule,'rule_version':'1.0.0','revision_id':rev,'status':status,'objects':objects,'evidence':evidence,'inputs':inputs or {},'explanation':evidence})
     add('LAYOUT',layout['status'],[r.id for r in b.rooms],'; '.join(i['reason'] for i in layout['issues']) or layout['circulation'],{'room_count':len(b.rooms),'setback_m':b.site.setback})
     if not structure['beams']:
@@ -78,6 +81,7 @@ def evaluate_rules(b,structure,layout,routing,fitout,rev,solar=None,fire=None,la
     add('PH-CODE','unsupported',[b.id],'No Philippine statutory rules are verified. This is preliminary planning and review support, requiring appropriate professional review for construction and approval.')
     gaps=(['Torsion, orthogonal effects, P-Δ, irregular and multi-storey buildings, dynamic analysis','Connections, base plates and anchor bolts','Foundation settlement, punching shear and reinforcement'] if lateral and lateral.get('enabled') else
           ['Whole-building stability, wind and seismic','Steel column buckling and connections','Foundation uplift, eccentric contact, settlement, sliding, overturning, punching and reinforcement'])
-    for name in gaps+['Electrical protection, conductor sizing and voltage drop','Plumbing hydraulic sizing, venting and pipe diameter adequacy']:
+    # A scoped check lists only its own discipline's gaps; other disciplines appear once in the result's coverage.
+    for name in gaps+([] if scope else ['Electrical protection, conductor sizing and voltage drop','Plumbing hydraulic sizing, venting and pipe diameter adequacy']):
         add('PH-CODE','unsupported',[b.id],f'{name}: not evaluated by the supported analytical family.')
     return results

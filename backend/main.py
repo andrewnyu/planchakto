@@ -14,7 +14,8 @@ from .rules import RULES
 from .structure import CATALOG
 from .geometry import parse_survey,validate_site
 from .layout import generate_layouts
-from .ai import AIRequest,interpret,status
+from .ai import AIRequest,Attachment,interpret,status
+from . import quickcheck
 from .example import example
 from .compose import ProjectSpec,TEMPLATES,Template,template_spec,apply_answer,questions_for,compose,preview
 from .ai import compose_turn
@@ -259,6 +260,39 @@ def build_compose_session(id:str):
 def compose_build(req:BuildRequest):
     b,notes=compose(req.spec)
     return {'revision':store().import_model(b,label=f'New project · {b.name}'[:120]),'notes':notes}
+class QuickCheckRequest(Model):
+    discipline:Literal['structure']='structure'
+    attachment:Attachment
+    page:int=Field(default=0,ge=0,le=500)
+class QuickSampleRequest(Model):
+    discipline:Literal['structure']='structure'
+    live:bool=False
+def _quick_id(id:str):
+    if not quickcheck.ID.match(id):raise KeyError('Quick check not found')
+    return id
+def _reading(fn):
+    """Drawing reads: no provider is a 503 the page explains; a failed or invalid model reply is a 502 with nothing saved."""
+    try:return quickcheck.public(fn())
+    except RuntimeError as e:return JSONResponse(status_code=503,content={'detail':str(e),'mode':'unavailable'})
+    except ValidationError:
+        log.exception('Sheet reading did not validate')
+        return JSONResponse(status_code=502,content={'detail':'The drawing could not be read into a structural grid. Try a clearer sheet or a single page.','mode':'error'})
+    except (ValueError,KeyError):raise
+    except Exception as e:
+        log.exception('Quick check reading failed')
+        return JSONResponse(status_code=502,content={'detail':f'The AI reading failed ({type(e).__name__}). Nothing was saved; try again.','mode':'error'})
+@app.post('/api/quick-checks')
+def create_quick_check(req:QuickCheckRequest):
+    raw=req.attachment.raw()
+    return _reading(lambda:quickcheck.create(store(),req.discipline,raw,req.attachment.mime_type,req.attachment.name,req.page))
+@app.post('/api/quick-checks/sample')
+def sample_quick_check(req:QuickSampleRequest):return _reading(lambda:quickcheck.create_sample(store(),req.discipline,req.live))
+@app.get('/api/quick-checks/{id}')
+def get_quick_check(id:str):return quickcheck.public(store().get_quick_check(_quick_id(id)))
+@app.get('/api/quick-checks/{id}/image')
+def quick_check_image(id:str):return Response(store().get_quick_check_image(_quick_id(id)),media_type='image/png',headers={'Cache-Control':'private, max-age=86400'})
+@app.post('/api/quick-checks/{id}/run')
+def run_quick_check(id:str,inputs:quickcheck.StructuralInputs):return quickcheck.public(quickcheck.run(store(),_quick_id(id),inputs))
 @app.post('/api/import/project')
 def import_project(req:ImportRequest):return store().import_model(req.model)
 @app.post('/api/import/survey')

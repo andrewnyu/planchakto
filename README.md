@@ -19,7 +19,8 @@ Built for small PH architecture and engineering teams iterating on a modest sing
   Unanswered site values (fault distance, R, friction) stay `missing_input`. The result lands as a candidate revision, so the accepted design is kept until you apply it. Only single-storey footprints up to 30 × 30 m are supported, and the assistant says so when asked for more.
 
 - **See the full process.** The Planning graph is the default workspace. It connects site and brief inputs to layout, coordinated disciplines, quantities, and review/export. Progress comes from the current revision's inputs and computed screens; it never presents model preparation as professional approval.
-- **Review one system.** Upload a native BuildGraph project and go straight to plumbing, fire protection, electrical, structural, or solar findings. A PDF or image can be used as a layout reference through the configured AI provider, with a geometry-confirmation step before discipline review. The built-in plumbing sample gives the demo a reliable finding → fix → cost-impact loop.
+- **Quick check a drawing.** Upload one structural framing plan (PDF or image) and screen it on its own, in a separate workspace that never touches your projects or the demo. Gemini reads the sheet into a typed reading: grid lines with their positions on the page, columns, member sizes and loads. Deterministic code then maps that reading to inputs you confirm on top of the drawing. Values not on the sheet stay missing; anything defaulted is labelled "assumed". The engine runs scoped to structure: beams, footings and seismic. Every finding is pinned back onto the uploaded sheet, and checks that need other drawings are listed as not checked. A bundled sample sheet (`examples/quick-check/`) works with or without an AI provider. Fire, plumbing and electrical drawing readers are next. See [docs/QUICK_CHECK_PLAN.md](docs/QUICK_CHECK_PLAN.md).
+- **Review one system.** Inside a project, go straight to plumbing, fire protection, electrical, structural or solar findings. The built-in plumbing and fire samples load as candidates on the demo project, giving a reliable finding → fix → cost-impact loop.
 - **Edit the plan.** Move or swap rooms, move fixtures, furniture and equipment, change loads, remove columns, or edit the brief, grid and site. Edits work in a 2D scaled plan and a synchronized 3D model.
 - **See the impact before accepting.** Each edit creates a *candidate* revision. The accepted revision is never overwritten. You compare the two, then apply or discard.
 - **Run deterministic checks.** All of these are code, not AI:
@@ -70,7 +71,7 @@ npm run dev --prefix frontend   # http://127.0.0.1:5173
 
 To reset to the demo project, use the reset button in the app or `POST /api/reset`. Local state lives in `.data/buildgraph.sqlite3`.
 
-The shortest demo starts on the Planning graph: choose **Review an existing plan** → **Try a plumbing sample** → **Preview clear routes**. The candidate should change from two plumbing findings to none and show the modeled quantity-cost change before it is applied. See [docs/HACKATHON_DEMO.md](docs/HACKATHON_DEMO.md) for the full three-minute script and honest scope language.
+The shortest demo starts on the landing page: on the **Check a plan** card choose **Plumbing on the demo** → **Preview clear routes**. The candidate should change from two plumbing findings to none and show the modeled quantity-cost change before it is applied. See [docs/HACKATHON_DEMO.md](docs/HACKATHON_DEMO.md) for the full three-minute script and honest scope language.
 
 ## AI providers
 
@@ -111,7 +112,11 @@ npm test --prefix frontend        # workflow status and discipline filtering
 .venv/bin/python scripts/eval_assistant.py --vertex planchakto --gcloud-user --model gemini-3.8-flash   # live assistant evals
 ```
 
-`backend/evals/cases.py` holds 32 scripted conversations: houses, offices and warehouses, multi-turn corrections, ambiguous, unsupported and conflicting requests, questions and budget feedback. The runner fails if any case breaks a release invariant: invalid output, an unbuildable or corrupted project, an edit on a clarification or unsupported turn, or an invented budget or site value. Missed expectations are reported as the quality score. Reports go to `.data/evals/`. On 2026-10-17, gemini-3.8-flash passed 32/32 cases and 59/59 expectations, with a median single-turn time of 7.9 s.
+```bash
+.venv/bin/python scripts/eval_quick_check.py --vertex planchakto --gcloud-user   # live drawing-reading evals
+```
+
+`backend/evals/cases.py` holds 32 scripted conversations: houses, offices and warehouses, multi-turn corrections, ambiguous, unsupported and conflicting requests, questions and budget feedback. The runner fails if any case breaks a release invariant: invalid output, an unbuildable or corrupted project, an edit on a clarification or unsupported turn, or an invented budget or site value. Missed expectations are reported as the quality score. Reports go to `.data/evals/`. The Quick check eval reads three sheets with known answers: the bundled sample, the demo's own S-1 permit sheet (round trip through `drawings.py`), and an architectural sheet that must be flagged as not a framing plan. On 2026-10-17, gemini-3.8-flash passed 3/3 in about 10 s per sheet. On 2026-10-17, gemini-3.8-flash passed 32/32 cases and 59/59 expectations, with a median single-turn time of 7.9 s.
 
 The tests cover edit propagation, the engineering calculations against closed-form results, revision immutability, idempotency, undo/redo, import/export, AI plan validation and provider selection. AI calls are mocked, and no live requests are made. `scripts/fixtures.py` regenerates the files in `examples/`.
 
@@ -184,6 +189,7 @@ backend/
   rules.py        rule catalogue with sources
   ai.py           Gemini / OpenRouter interpreter + plan validation
   agent.py        design agent: bounded tool loop, check feedback, streamed events
+  quickcheck.py   Quick check: rasterize, Gemini sheet reading, mapping, scoped run
   evals/          assistant evaluation cases and runner
   store.py        SQLite revision store (cloud_store.py for GCP)
 frontend/src/
@@ -191,7 +197,7 @@ frontend/src/
   Workflow.tsx    interactive planning-process graph
   planning.ts     derived progress and discipline check filters
   DisciplineReview.tsx focused review, plan context and quick fixes
-  ReviewUpload.tsx native-project and drawing-reference entry
+  QuickCheck.tsx  single-drawing check: upload, confirm on the sheet, findings overlay
   Plan.tsx        2D SVG plan
   Model3D.tsx     Three.js model (lazy-loaded)
   Solar.tsx       solar PV results and inputs (Engineering tab)

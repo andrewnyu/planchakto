@@ -18,6 +18,9 @@ class LocalStore:
             db.execute('CREATE TABLE IF NOT EXISTS state(id INTEGER PRIMARY KEY CHECK(id=1), data TEXT NOT NULL)')
             db.execute('CREATE TABLE IF NOT EXISTS commands(id TEXT PRIMARY KEY, fingerprint TEXT NOT NULL, revision TEXT NOT NULL)')
             db.execute('CREATE TABLE IF NOT EXISTS compose_sessions(id TEXT PRIMARY KEY, updated_at REAL NOT NULL, data TEXT NOT NULL)')
+            # Quick checks live apart from the project revision history: no accept, undo or branching.
+            db.execute('CREATE TABLE IF NOT EXISTS quick_checks(id TEXT PRIMARY KEY, updated_at REAL NOT NULL, data TEXT NOT NULL)')
+            db.execute('CREATE TABLE IF NOT EXISTS quick_check_images(id TEXT PRIMARY KEY, data BLOB NOT NULL)')
     @contextmanager
     def db(self):
         db=sqlite3.connect(self.path,timeout=30);db.row_factory=sqlite3.Row
@@ -118,3 +121,16 @@ class LocalStore:
         marks=','.join('?'*len(statuses))
         with self.db() as db:r=db.execute(f"SELECT data FROM compose_sessions WHERE json_extract(data,'$.status') IN ({marks}) ORDER BY updated_at DESC LIMIT 1",tuple(statuses)).fetchone()
         return json.loads(r['data']) if r else None
+    def save_quick_check(self,record):
+        with self.db() as db:db.execute('INSERT OR REPLACE INTO quick_checks VALUES (?,?,?)',(record['id'],record['updated_at'],json.dumps(record)))
+        return record
+    def get_quick_check(self,id):
+        with self.db() as db:r=db.execute('SELECT data FROM quick_checks WHERE id=?',(id,)).fetchone()
+        if r is None:raise KeyError('Quick check not found')
+        return json.loads(r['data'])
+    def save_quick_check_image(self,id,png:bytes):
+        with self.db() as db:db.execute('INSERT OR REPLACE INTO quick_check_images VALUES (?,?)',(id,png))
+    def get_quick_check_image(self,id)->bytes:
+        with self.db() as db:r=db.execute('SELECT data FROM quick_check_images WHERE id=?',(id,)).fetchone()
+        if r is None:raise KeyError('Quick check image not found')
+        return bytes(r['data'])
