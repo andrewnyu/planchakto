@@ -45,7 +45,7 @@ class Fixture(Model):
     dx: float
     dy: float
     elevation: float = 0
-    kind: Literal['sink','wc','basin']
+    kind: Literal['sink','wc','basin','shower','washer']
 
 class Equipment(Model):
     id: str
@@ -327,7 +327,7 @@ class AddElement(Model):
     dy: float
     watts: float | None = Field(default=None,ge=0,le=100000)
     circuit_id: str | None = None
-    fixture_kind: Literal['sink','wc','basin'] = 'basin'
+    fixture_kind: Literal['sink','wc','basin','shower','washer'] = 'basin'
     w: float = Field(default=1.2,gt=0,le=5)
     h: float = Field(default=.6,gt=0,le=5)
 class SetSolar(Model):

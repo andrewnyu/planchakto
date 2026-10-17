@@ -258,6 +258,76 @@ def _clear_point(room, cols, dx, dy):
     return dx, dy
 
 
+def _inward(r, hall, d):
+    """A room-relative y d metres in from the room's exterior wall (the side away from the corridor)."""
+    return d if r['y'] < hall.y else r['h'] - d
+
+
+def _circuit(b, id, name):
+    if all(c.id != id for c in b.circuits): b.circuits.append(Circuit(id=id, name=name))
+    return id
+
+
+def _equip(b, r, cols, key, label, dx, dy, watts, circuit, source):
+    x, y = _clear_point(r, cols, dx, dy)
+    b.equipment.append(Equipment(id=f'{key}-{r["id"]}', name=f'{r["name"]} {label}', room_id=r['id'], dx=x, dy=y, watts=watts, circuit_id=circuit, source=source))
+
+
+def _fixture(b, r, cols, key, label, kind, dx, dy):
+    x, y = _clear_point(r, cols, dx, dy)
+    b.fixtures.append(Fixture(id=f'{key}-{r["id"]}', name=f'{r["name"]} {label}', room_id=r['id'], dx=x, dy=y, kind=kind))
+
+
+def _house_bathroom(b, r, cols, hall):
+    """Shower at the exterior wall with the WC and basin nearer the door; an outdoor shower is a cold rinse with no WC."""
+    w = r['w']
+    _fixture(b, r, cols, 'shower', 'shower', 'shower', w / 2, _inward(r, hall, .55))
+    if 'shower' in r['name'].lower() and 'bath' not in r['name'].lower(): return
+    _fixture(b, r, cols, 'wc', 'WC', 'wc', min(.45, w / 2), _inward(r, hall, 1.5))
+    _fixture(b, r, cols, 'basin', 'basin', 'basin', *((max(w - .4, w / 2), _inward(r, hall, 1.5)) if w >= 1.4 else (w / 2, _inward(r, hall, 2.2))))
+    _equip(b, r, cols, 'heater', 'water heater', min(w - .3, w / 2 + .45), _inward(r, hall, .3), 3500, _circuit(b, 'C05', 'Water heaters'),
+           'Typical 3.5 kW single-point heater; replace with the specified unit')
+
+
+def _house_services(b, r, cols, hall):
+    """Appliances and convenience outlets (180 VA each, the usual allowance per outlet); nameplate values are typical, not specified."""
+    w, h, name, kind = r['w'], r['h'], r['name'].lower(), r['kind']
+    outlets = {'bedroom': 3, 'living': 1 if 'veranda' in name else 4, 'kitchen': 2}.get(kind, 1 if 'laundry' in name else 0)
+    if outlets: _equip(b, r, cols, 'outlets', f'outlets ({outlets})', .3, h / 2, 180 * outlets, 'C02', f'Allowance: {outlets} × 180 VA convenience outlets')
+    if kind == 'kitchen':
+        _equip(b, r, cols, 'range', 'range and hood', min(w - .5, 1.6), .45, 2150, _circuit(b, 'C04', 'Kitchen range'), 'Typical 2 kW two-burner range and 150 W hood')
+    if 'laundry' in name:
+        _fixture(b, r, cols, 'washer', 'washing machine', 'washer', .45, _inward(r, hall, .5))
+        _fixture(b, r, cols, 'tub', 'laundry tub', 'sink', min(w - .4, 1.3), _inward(r, hall, .5))
+        _equip(b, r, cols, 'washerpower', 'washing machine', .45, _inward(r, hall, .9), 500, _circuit(b, 'C06', 'Laundry'), 'Typical 500 W top-load washer')
+
+
+def _house_furniture(b, placed, hall):
+    """Typical furniture per room, each at the fitting spot nearest its usual place; whatever cannot clear doors, columns and
+    access strips is left out rather than forced in."""
+    from .domain import _fits
+    from .geometry import openings
+    rooms = {r.id: r for r in b.rooms}; doors = openings(b); cols = [c for c in b.columns if c.active]
+    for p in placed:
+        r = rooms[p['id']]; name = r.name.lower(); mine = [d for d in doors if d['room_id'] == r.id]
+        ext = lambda d, size: d if r.y < hall.y else r.h - size - d  # offset from the exterior wall
+        items = []
+        if r.kind == 'bedroom':
+            bw = 1.5 if r.w >= 2.8 else 1.0
+            items = [('bed', 'Bed', bw, 2, (r.w - bw) / 2, ext(.6, 2)), ('wardrobe', 'Wardrobe', 1.2, .6, r.w - 1.3, ext(.6, .6) if r.h < 3.6 else r.h / 2)]
+        elif r.kind == 'living' and 'veranda' in name:
+            items = [('lounger1', 'Lounge chair', .7, 1.4, .3, ext(.7, 1.4)), ('lounger2', 'Lounge chair', .7, 1.4, 1.2, ext(.7, 1.4)), ('outdoor-table', 'Outdoor table', .8, .8, r.w - 1.1, ext(.8, .8))]
+        elif r.kind == 'living':
+            items = [('sofa', 'Sofa', 2.2, .9, .6, ext(.7, .9)), ('coffee', 'Coffee table', 1.0, .5, .9, ext(1.9, .5)), ('tv', 'TV console', 1.6, .4, .9, ext(3.0, .4))]
+            if r.w >= 6: items.append(('dining', 'Dining table', 1.6, .9, r.w - 2.3, ext(1.0, .9)))
+        for key, label, fw, fh, ax, ay in items:
+            f = Furniture(id=f'{key}-{r.id}', name=label, room_id=r.id, dx=0, dy=0, w=fw, h=fh, clearance=.6 if label in ('Bed', 'Sofa', 'Wardrobe', 'Dining table') else .3)
+            others = [o for o in b.furniture if o.room_id == r.id]
+            spots = [(round(i * .1, 3), round(f.clearance + j * .1, 3)) for i in range(int((r.w - fw) / .1 + 1e-9) + 1) for j in range(int((r.h - fh - f.clearance) / .1 + 1e-9) + 1)]
+            spot = min((s for s in spots if _fits(r, f, *s, others, mine, cols)), key=lambda s: (s[0] - ax) ** 2 + (s[1] - ay) ** 2, default=None)
+            if spot: f.dx, f.dy = spot; b.furniture.append(f)
+
+
 def compose(spec: ProjectSpec) -> tuple[Building, list[str]]:
     """Build the model and return it with a list of the decisions the generator made."""
     from .structure import analyze_structure, CATALOG
@@ -310,8 +380,11 @@ def compose(spec: ProjectSpec) -> tuple[Building, list[str]]:
     # Services: wet fixtures, lighting, power and air conditioning on three circuits.
     b.circuits = [Circuit(id='C01', name='Lighting'), Circuit(id='C02', name='General power'), Circuit(id='C03', name='Air conditioning')]
     cols = b.columns
+    house = spec.template == 'house'
     for r in placed:
-        if r['kind'] == 'bathroom':
+        if r['kind'] == 'bathroom' and house:
+            _house_bathroom(b, r, cols, hall)
+        elif r['kind'] == 'bathroom':
             (wx, wy), (bx, by) = _clear_point(r, cols, .75, .75), _clear_point(r, cols, max(.6, min(2, r['w'] - .6)), .75)
             b.fixtures += [Fixture(id=f'wc-{r["id"]}', name=f'{r["name"]} WC', room_id=r['id'], dx=wx, dy=wy, kind='wc'),
                            Fixture(id=f'basin-{r["id"]}', name=f'{r["name"]} basin', room_id=r['id'], dx=bx, dy=by, kind='basin')]
@@ -321,7 +394,7 @@ def compose(spec: ProjectSpec) -> tuple[Building, list[str]]:
         dx, dy = _clear_point(r, cols, r['w'] / 2, r['h'] / 2)
         lux = 6 if r['kind'] == 'storage' else 10
         b.equipment.append(Equipment(id=f'light-{r["id"]}', name=f'{r["name"]} lighting', room_id=r['id'], dx=dx, dy=dy, watts=round(r['w'] * r['h'] * lux / 10) * 10 or 20, circuit_id='C01', source='Allowance: ' + str(lux) + ' W/m²'))
-        if r['kind'] in ('office', 'retail', 'bedroom', 'living'):
+        if r['kind'] in ('office', 'retail', 'bedroom', 'living') and 'veranda' not in r['name'].lower():  # an open veranda is not air-conditioned
             ax, ay = _clear_point(r, cols, min(r['w'] - .5, 1.0), max(.5, r['h'] - .5))
             b.equipment.append(Equipment(id=f'ac-{r["id"]}', name=f'{r["name"]} air conditioner', room_id=r['id'], dx=ax, dy=ay, watts=1500 if r['w'] * r['h'] > 30 else 1000, circuit_id='C03', source='Allowance by room size'))
         if r['kind'] == 'kitchen':
@@ -330,11 +403,10 @@ def compose(spec: ProjectSpec) -> tuple[Building, list[str]]:
         if r['kind'] in ('office', 'retail'):
             sx, sy = _clear_point(r, cols, .6, .6)
             b.equipment.append(Equipment(id=f'power-{r["id"]}', name=f'{r["name"]} workstations', room_id=r['id'], dx=sx, dy=sy, watts=350, circuit_id='C02'))
-    # House furniture, kept only where it clears doors and access strips.
-    if spec.template == 'house':
-        for r in placed:
-            if r['kind'] == 'bedroom' and r['w'] >= 3 and r['h'] >= 3.2: b.furniture.append(Furniture(id=f'bed-{r["id"]}', name='Bed', room_id=r['id'], dx=1, dy=.9, w=1.5, h=2))
-            if r['kind'] == 'living' and r['w'] >= 3.5: b.furniture.append(Furniture(id=f'sofa-{r["id"]}', name='Sofa', room_id=r['id'], dx=.6, dy=.6, w=2.2, h=.9))
+    # House fit-out: appliances, outlets and furniture a real house has, so routes, loads and the plan read like one.
+    if house:
+        for r in placed: _house_services(b, r, cols, hall)
+        _house_furniture(b, placed, hall)
         issues = {o for i in fitout_checks(b)['issues'] for o in i['objects']}
         b.furniture = [f for f in b.furniture if f.id not in issues]
 
