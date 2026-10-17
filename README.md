@@ -8,7 +8,7 @@ Built for small PH architecture and engineering teams iterating on a modest sing
 
 ## What it does
 
-- **Start a new project from a template.** Pick a house, a commercial building or a warehouse and describe it in plain language. Gemini turns the description into a typed project spec (name, location, use and room programme). It then asks only about what is still undecided, offering two to four suggested answers per question that you select, as in a guided interview. Picking a suggestion applies a validated value instantly; free text goes back to Gemini. A deterministic generator (`backend/compose.py`) builds the model from the spec:
+- **Start a new project from a template.** Pick a house, a commercial building or a warehouse and describe it in plain language. Gemini turns the description into a typed project spec (name, location, use and room programme). It then asks only about what is still undecided, offering two to four suggested answers per question that you select, as in a guided interview. Picking a suggestion applies a validated value instantly; free text goes to the design agent (`backend/agent.py`). It runs a bounded tool loop: Gemini calls typed tools (update the brief, add, resize or remove rooms, run checks, look up a rule), and after every edit the loop re-plans the building and runs every check. The results (footprint, failures, estimated cost against the budget) go back to Gemini before it may answer, so the reply quotes real numbers and offers a fix. Each tool step and the reply stream live to the chat. Budget and site values are refused unless the user supplied them, and clarification or out-of-scope turns leave the project unchanged. The conversation is saved server-side, survives a refresh, and moves with the project into the project assistant after Build. A deterministic generator (`backend/compose.py`) builds the model from the spec:
   - it lays out two room strips around the corridor
   - it places columns in shared walls clear of every corridor door
   - it chooses the coarsest grid and the lightest beam, column and pad sizes that pass the checks
@@ -107,6 +107,12 @@ npm test --prefix frontend        # workflow status and discipline filtering
 .venv/bin/python scripts/benchmark.py   # writes docs/BENCHMARKS.json
 ```
 
+```bash
+.venv/bin/python scripts/eval_assistant.py --vertex planchakto --gcloud-user --model gemini-3.8-flash   # live assistant evals
+```
+
+`backend/evals/cases.py` holds 32 scripted conversations: houses, offices and warehouses, multi-turn corrections, ambiguous, unsupported and conflicting requests, questions and budget feedback. The runner fails if any case breaks a release invariant: invalid output, an unbuildable or corrupted project, an edit on a clarification or unsupported turn, or an invented budget or site value. Missed expectations are reported as the quality score. Reports go to `.data/evals/`. On 2026-10-17, gemini-3.8-flash passed 32/32 cases and 59/59 expectations, with a median single-turn time of 7.9 s.
+
 The tests cover edit propagation, the engineering calculations against closed-form results, revision immutability, idempotency, undo/redo, import/export, AI plan validation and provider selection. AI calls are mocked, and no live requests are made. `scripts/fixtures.py` regenerates the files in `examples/`.
 
 ## Docker and deployment
@@ -177,6 +183,8 @@ backend/
   drawings.py     permit sheet set → PDF (reportlab) and DXF (ezdxf)
   rules.py        rule catalogue with sources
   ai.py           Gemini / OpenRouter interpreter + plan validation
+  agent.py        design agent: bounded tool loop, check feedback, streamed events
+  evals/          assistant evaluation cases and runner
   store.py        SQLite revision store (cloud_store.py for GCP)
 frontend/src/
   App.tsx         workspace, tabs, inspector, assistant

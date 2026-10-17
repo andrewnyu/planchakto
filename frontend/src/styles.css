@@ -136,3 +136,4 @@
 .sketch-chip img{width:64px;height:48px;object-fit:cover;border-radius:4px;border:1px solid var(--line);flex-shrink:0}
 .sketch-chip .icon-button{margin-left:auto;flex-shrink:0}
 .ai-response .button{margin-top:8px}
+.assistant-thread{display:flex;flex-direction:column;gap:8px;margin:4px 0 16px;padding:12px;border:1px solid #e0e8d4;border-radius:7px;background:#f4f7ee;max-height:280px;overflow:auto}.assistant-thread-head{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:10px;color:#647257}.assistant-thread-head button{font-size:10px;color:#4f6f3c;text-decoration:underline}.thread-msg{font-size:11px;line-height:1.55;padding:7px 9px;border-radius:6px;max-width:92%;white-space:pre-wrap;overflow-wrap:anywhere}.thread-msg.user{align-self:flex-end;background:#416542;color:#fff}.thread-msg.assistant{align-self:flex-start;background:#fff;border:1px solid #e1e8d6;color:#4f6340}

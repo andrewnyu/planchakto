@@ -95,14 +95,13 @@ def test_turns_and_build_without_ai(client):
     assert client.get('/api/project').json()['state']['head'] == head  # the accepted design is untouched until applied
 
 
-def test_ai_turn_parses_wrapped_json_and_drops_invalid_options(monkeypatch):
-    spec = template_spec('commercial').model_dump() | {'name': 'Ngiti Dental', 'template': 'house'}
-    reply = {'reply': 'Renamed it.', 'spec': spec, 'questions': [
+def test_ai_turn_parses_wrapped_json_and_drops_invalid_options():
+    final = {'reply': 'Renamed it.', 'outcome': 'updated', 'questions': [
         {'field': 'height', 'header': 'Height', 'question': 'How tall?', 'options': [{'label': '3 m', 'value': 3}, {'label': '9 m', 'value': 9}, {'label': '4 m', 'value': 4}]},
         {'field': 'storeys', 'header': 'Storeys', 'question': 'How many?', 'options': [{'label': '1', 'value': 1}, {'label': '2', 'value': 2}]}]}
-    monkeypatch.setenv('OPENROUTER_API_KEY', 'x'); monkeypatch.setenv('OPENROUTER_MODEL', 'm'); monkeypatch.setenv('BUILDGRAPH_AI_PROVIDER', 'openrouter')
-    monkeypatch.setattr(ai, '_openrouter', lambda payload, attachment=None, system=None: '<invoke>' + json.dumps(reply) + '</invoke>')
-    out = ai.compose_turn('commercial', template_spec('commercial'), [], 'call it Ngiti Dental')
+    script = iter([{'calls': [{'tool': 'update_brief', 'args': {'fields': {'name': 'Ngiti Dental'}}}]}, final])
+    llm = lambda payload, system: iter(['<invoke>' + json.dumps(next(script)) + '</invoke>'])
+    out = ai.compose_turn('commercial', template_spec('commercial'), [], 'call it Ngiti Dental', llm=llm)
     assert out['spec'].name == 'Ngiti Dental' and out['spec'].template == 'commercial'  # the template cannot be switched by the model
     assert [q['field'] for q in out['questions']] == ['height']
     assert [o['value'] for o in out['questions'][0]['options']] == [3, 4]

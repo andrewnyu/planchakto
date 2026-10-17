@@ -1,5 +1,5 @@
 import {useEffect, useRef, useState} from 'react';
-import {ArrowLeft, ArrowRight, Box, Check, CheckCircle2, ChevronRight, CircleDashed, FileText, GitBranch, Hammer, Home, Layers, Loader2, Plus, Send, Sparkles, Store, Warehouse} from 'lucide-react';
+import {AlertTriangle, ArrowLeft, ArrowRight, Box, Check, CheckCircle2, ChevronRight, CircleDashed, FileText, GitBranch, Hammer, Home, Layers, Loader2, Plus, RotateCcw, Send, Sparkles, Store, Undo2, Warehouse} from 'lucide-react';
 import type {Revision} from './types';
 import {api, money, num} from './api';
 import {roomColors} from './Plan';
@@ -12,9 +12,11 @@ type Question = {field: string; header: string; question: string; options: Optio
 type RoomSpec = {name: string; kind: string; area: number; count: number};
 type Spec = {template: TemplateId; name: string | null; location: string | null; use: string | null; rooms: RoomSpec[]; [key: string]: unknown};
 type Preview = {ok: boolean; error?: string; width?: number; depth?: number; height?: number; rooms?: {id: string; name: string; kind: string; x: number; y: number; w: number; h: number}[]; columns?: number[][]; area?: number; notes?: string[]; missing: string[]};
-type Turn = {spec: Spec; reply: string | null; questions: Question[]; remaining: number; preview: Preview; mode: string; ai_provider: string | null};
+type Turn = {id: string; template: TemplateId; spec: Spec; questions: Question[]; remaining: number; preview: Preview; mode: string; ai_provider: string | null; messages: PersistedMessage[]; can_undo: boolean; has_changes: boolean};
 type Edit = {field: string; label: string; before: string; after: string};
-type Message = {role: 'user' | 'assistant'; text: string; changes?: Edit[]};
+type AgentStep = {id: string; label: string; status: 'active' | 'complete' | 'error'; detail?: string};
+type Message = {role: 'user' | 'assistant'; text: string; changes?: Edit[]; status?: string; outcome?: string; steps?: AgentStep[]};
+type PersistedMessage = Message & {before_spec?: Spec; after_spec?: Spec};
 
 const icons: Record<TemplateId, typeof Home> = {house: Home, commercial: Store, warehouse: Warehouse};
 const blurbs: Record<TemplateId, string> = {house: 'Living, kitchen, bath and bedrooms on a 1.5 m hall.', commercial: 'Showroom, offices, stockroom, pantry and toilets for a shop or clinic.', warehouse: 'A tall storage hall with a loading bay and a small office.'};
@@ -69,6 +71,22 @@ const describeChanges = (before: Spec, after: Spec): Edit[] => {
   });
   return edits;
 };
+const hydrateMessages = (messages: PersistedMessage[]): Message[] => messages.map(message => ({...message,
+  changes: message.before_spec && message.after_spec ? describeChanges(message.before_spec, message.after_spec) : message.changes,
+}));
+
+async function streamTurn(id: string, body: unknown, onEvent: (event: any) => void) {
+  const res = await fetch(`/api/compose/sessions/${id}/turn/stream`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+  if (!res.ok || !res.body) throw new Error(`The design session could not be updated (${res.status}).`);
+  const reader = res.body.getReader(), decoder = new TextDecoder(); let buffer = '';
+  while (true) {
+    const {done, value} = await reader.read(); buffer += decoder.decode(value ?? new Uint8Array(), {stream: !done});
+    const lines = buffer.split('\n'); buffer = lines.pop() ?? '';
+    for (const line of lines) if (line.trim()) onEvent(JSON.parse(line));
+    if (done) break;
+  }
+  if (buffer.trim()) onEvent(JSON.parse(buffer));
+}
 
 export function NewProject({aiProvider, onExit, onBuilt}: {aiProvider: string | null; onExit: () => void; onBuilt: (revision: Revision, notes: string[]) => Promise<void>}) {
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -80,30 +98,50 @@ export function NewProject({aiProvider, onExit, onBuilt}: {aiProvider: string | 
   const [other, setOther] = useState<Record<string, string>>({});
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState('');
+  const [steps, setSteps] = useState<AgentStep[]>([]);
+  const [streamingReply, setStreamingReply] = useState('');
   const [error, setError] = useState('');
   const [workspaceTab, setWorkspaceTab] = useState<'plan' | 'brief'>('plan');
   const end = useRef<HTMLDivElement>(null);
   const chatScroll = useRef<HTMLDivElement>(null);
-  useEffect(() => {api<Template[]>('/compose/templates').then(setTemplates).catch(() => setError('Could not load the templates.'));}, []);
+  useEffect(() => {
+    api<Template[]>('/compose/templates').then(setTemplates).catch(() => setError('Could not load the templates.'));
+    api<{session: Turn | null}>('/compose/sessions/latest').then(({session}) => {
+      if (session) {setTemplate(session.template); setTurn(session); setMessages(hydrateMessages(session.messages));}
+    }).catch(() => setError('Could not restore the latest design session.'));
+  }, []);
   useEffect(() => {chatScroll.current?.scrollTo({top: chatScroll.current.scrollHeight, behavior: 'smooth'});}, [messages, turn?.questions, busy]);
 
-  const send = async (body: {message?: string; answers?: {field: string; value: unknown}[]}, shown?: string) => {
+  const useSession = (next: Turn) => {setTurn(next); setTemplate(next.template); setMessages(hydrateMessages(next.messages)); setPicked({}); setOther({});};
+  const send = async (body: {message?: string; answers?: {field: string; value: unknown}[]}, shown?: string, base?: Turn) => {
     if (busy) return;
-    const previousSpec = turn?.spec ?? null;
-    const history = messages.map(({role, text}) => ({role, text}));
-    const visible = shown ? [...messages, {role: 'user' as const, text: shown}] : messages;
-    if (shown) setMessages(visible);
+    const current = base ?? turn;
+    if (!current) return;
+    if (shown) setMessages(prev => [...prev, {role: 'user', text: shown}]);
+    setSteps([]); setStreamingReply('');
     setBusy(body.message ? (aiProvider ? 'Reading your request…' : 'Updating…') : 'Updating the plan…'); setError('');
     try {
-      const next = await api<Turn>('/compose/turn', {template, spec: turn?.spec ?? null, history, ...body});
-      const changes = previousSpec ? describeChanges(previousSpec, next.spec) : [];
-      setTurn(next); setPicked({}); setOther({});
-      const reply = next.reply ?? (changes.length ? `I updated ${changes.length === 1 ? 'one part' : `${changes.length} parts`} of the project brief.` : 'The project brief is up to date.');
-      if (next.reply || changes.length) setMessages([...visible, {role: 'assistant', text: reply, changes}]);
+      await streamTurn(current.id, {...body, shown}, event => {
+        if (event.type === 'step') {
+          const next: AgentStep = {id: event.id, label: event.label, status: event.status, detail: event.detail};
+          setSteps(prev => prev.some(step => step.id === next.id) ? prev.map(step => step.id === next.id ? next : step) : [...prev, next]);
+          if (event.status === 'active') setBusy(event.label);
+        } else if (event.type === 'reply_delta') setStreamingReply(prev => prev + event.text);
+        else if (event.type === 'reply_reset') setStreamingReply('');
+        else if (event.type === 'final') useSession(event.session);
+        else if (event.type === 'error') throw new Error(event.detail);
+      });
     } catch (e) {setError(e instanceof Error ? e.message : 'That did not work. Try again.');}
-    finally {setBusy('');}
+    finally {setBusy(''); setSteps([]); setStreamingReply('');}
   };
-  const start = () => send(brief.trim() ? {message: brief.trim()} : {}, brief.trim() || undefined);
+  const start = async () => {
+    if (busy) return;
+    setBusy('Starting design session…'); setError('');
+    try {
+      const session = await api<Turn>('/compose/sessions', {template}); useSession(session); setBusy('');
+      if (brief.trim()) await send({message: brief.trim()}, brief.trim(), session);
+    } catch (e) {setError(e instanceof Error ? e.message : 'The design session could not be started.'); setBusy('');}
+  };
   const submitAnswers = () => {
     const answers = Object.entries(picked).map(([field, value]) => ({field, value}));
     const notes = Object.entries(other).filter(([, v]) => v.trim());
@@ -118,9 +156,17 @@ export function NewProject({aiProvider, onExit, onBuilt}: {aiProvider: string | 
   const build = async () => {
     if (!turn || busy) return;
     setBusy('Building the model and running every check…'); setError('');
-    try {const res = await api<{revision: Revision; notes: string[]}>('/compose/build', {spec: turn.spec}); await onBuilt(res.revision, res.notes);}
+    try {const res = await api<{revision: Revision; notes: string[]}>(`/compose/sessions/${turn.id}/build`, {}); await onBuilt(res.revision, res.notes);}
     catch (e) {setError(e instanceof Error ? e.message : 'The project could not be built.'); setBusy('');}
   };
+  const restore = async (action: 'undo' | 'reject') => {
+    if (!turn || busy) return;
+    setBusy(action === 'undo' ? 'Reverting the latest edit…' : 'Restoring the original template…'); setError('');
+    try {useSession(await api<Turn>(`/compose/sessions/${turn.id}/${action}`, {}));}
+    catch (e) {setError(e instanceof Error ? e.message : 'The project state could not be restored.');}
+    finally {setBusy('');}
+  };
+  const newTask = () => {setTurn(null); setMessages([]); setBrief(''); setPicked({}); setOther({}); setError('');};
 
   if (!turn) return <div className="composer composer-launch-screen">
     <header className="agent-topbar"><div className="agent-brand"><span className="agent-logo"><Box size={18} strokeWidth={1.65}/></span><strong>Planchakto</strong><ChevronRight size={13}/><span>Design assistant</span></div><div className="agent-topbar-actions"><span className={'agent-connection' + (aiProvider ? ' live' : '')}><i/>{aiProvider ? 'AI connected' : 'Guided mode'}</span><button className="agent-ghost-button" onClick={onExit}><ArrowLeft size={14}/> Back to home</button></div></header>
@@ -153,8 +199,8 @@ export function NewProject({aiProvider, onExit, onBuilt}: {aiProvider: string | 
         <header className="chat-panel-head"><div><span className="chat-agent-icon"><Sparkles size={14}/></span><span><strong>Design assistant</strong><small>{aiProvider ? 'Agent · can edit project brief' : 'Guided questionnaire'}</small></span></div><span className="chat-session">{messages.filter(m => m.role === 'user').length + 1} turns</span></header>
         <div ref={chatScroll} className="chat-scroll" aria-live="polite">
           <div className="chat-msg assistant"><span className="chat-avatar"><Sparkles size={13}/></span><div className="message-body"><p>Starting from the <strong>{templates.find(t => t.id === template)?.label.toLowerCase()}</strong> template. {aiProvider ? 'Tell me what to change, or answer the questions below.' : 'Answer the questions below; free text needs an AI provider.'}</p><span className="message-context"><FileText size={11}/> project brief</span></div></div>
-          {messages.map((m, i) => <div key={i} className={'chat-msg ' + m.role}>{m.role === 'assistant' && <span className="chat-avatar"><Sparkles size={13}/></span>}<div className="message-body"><p>{m.text}</p>{m.changes && m.changes.length > 0 && <div className="inline-change-set"><strong><CheckCircle2 size={12}/> Applied {m.changes.length} {m.changes.length === 1 ? 'edit' : 'edits'}</strong>{m.changes.slice(0, 3).map(c => <span key={c.field}><i/> {c.label}: <b>{c.after}</b></span>)}{m.changes.length > 3 && <small>+{m.changes.length - 3} more in Agent edits</small>}</div>}</div></div>)}
-          {busy && <WorkProgress label={busy}/>}
+          {messages.map((m, i) => <div key={i} className={'chat-msg ' + m.role}>{m.role === 'assistant' && <span className="chat-avatar"><Sparkles size={13}/></span>}<div className="message-body">{m.role === 'assistant' && m.steps && m.steps.length > 0 && <details className="agent-trace"><summary>Worked through {m.steps.length} {m.steps.length === 1 ? 'step' : 'steps'}</summary><AgentSteps steps={m.steps}/></details>}<p>{m.text}</p>{m.changes && m.changes.length > 0 && <div className="inline-change-set"><strong><CheckCircle2 size={12}/> Applied {m.changes.length} {m.changes.length === 1 ? 'edit' : 'edits'}</strong>{m.changes.slice(0, 3).map(c => <span key={c.field}><i/> {c.label}: <b>{c.after}</b></span>)}{m.changes.length > 3 && <small>+{m.changes.length - 3} more in Agent edits</small>}</div>}</div></div>)}
+          {busy && (busy.startsWith('Building') || busy.startsWith('Starting') || busy.startsWith('Reverting') || busy.startsWith('Restoring') ? <WorkProgress label={busy}/> : <div className="chat-msg assistant live"><span className="chat-avatar"><Loader2 className="spin" size={13}/></span><div className="message-body">{steps.length ? <AgentSteps steps={steps}/> : <p className="agent-thinking">{busy}</p>}{streamingReply && <p className="streaming-reply">{streamingReply}<i className="caret"/></p>}</div></div>)}
           {!busy && turn.questions.length > 0 && <div className="question-stack">
             {turn.questions.map(q => <fieldset key={q.field} className="question-card">
               <legend><span className="question-chip">{q.header}</span>{q.question}</legend>
@@ -193,8 +239,12 @@ export function NewProject({aiProvider, onExit, onBuilt}: {aiProvider: string | 
 
 function WorkProgress({label}: {label: string}) {
   const building = label.startsWith('Building');
-  const steps = building ? ['Compose final model', 'Run engineering checks', 'Calculate quantities', 'Create candidate revision'] : ['Read your request', 'Update the typed brief', 'Regenerate the floor plan', 'Check the new geometry'];
-  return <div className="work-progress"><div className="work-progress-title"><span className="chat-avatar"><Loader2 className="spin" size={13}/></span><div><strong>{label}</strong><small>Working in the project model</small></div></div><ol>{steps.map((step, i) => <li key={step} className={i === 0 ? 'active' : ''}><span>{i === 0 ? <Loader2 className="spin" size={10}/> : <CircleDashed size={10}/>}</span>{step}</li>)}</ol></div>;
+  const steps = building ? ['Compose final model', 'Run engineering checks', 'Calculate quantities', 'Create candidate revision'] : [];
+  return <div className="work-progress"><div className="work-progress-title"><span className="chat-avatar"><Loader2 className="spin" size={13}/></span><div><strong>{label}</strong><small>{building ? 'One server request runs all of these' : 'Working in the project model'}</small></div></div>{steps.length > 0 && <ol>{steps.map(step => <li key={step}><span><CircleDashed size={10}/></span>{step}</li>)}</ol>}</div>;
+}
+
+function AgentSteps({steps}: {steps: AgentStep[]}) {
+  return <ol className="agent-steps">{steps.map(s => <li key={s.id} className={s.status}><span>{s.status === 'active' ? <Loader2 className="spin" size={10}/> : s.status === 'error' ? <AlertTriangle size={10}/> : <Check size={10}/>}</span><div><b>{s.label}</b>{s.detail && <small>{s.detail}</small>}</div></li>)}</ol>;
 }
 
 function EditHistory({edits}: {edits: Edit[]}) {

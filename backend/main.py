@@ -1,8 +1,8 @@
 from __future__ import annotations
-import os,io,csv,json,uuid,html,logging
+import os,io,csv,json,uuid,html,logging,time
 from pathlib import Path
 from fastapi import FastAPI,Request
-from fastapi.responses import JSONResponse,Response,HTMLResponse
+from fastapi.responses import JSONResponse,Response,HTMLResponse,StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError,Field
 from .domain import Building,CommandRequest,FireProtection,Model,digest
@@ -18,6 +18,7 @@ from .ai import AIRequest,interpret,status
 from .example import example
 from .compose import ProjectSpec,TEMPLATES,Template,template_spec,apply_answer,questions_for,compose,preview
 from .ai import compose_turn
+from .agent import run_compose_agent,assess,plan_summary
 from typing import Literal,Any
 
 app=FastAPI(title='BuildGraph',version='0.1.0')
@@ -110,6 +111,74 @@ class ComposeRequest(Model):
     answers:list[ComposeAnswer]=Field(default_factory=list,max_length=20)
     history:list[ComposeMessage]=Field(default_factory=list,max_length=40)
 class BuildRequest(Model):spec:ProjectSpec
+class ComposeSessionCreate(Model):template:Template
+class ComposeSessionTurn(Model):
+    message:str|None=Field(default=None,max_length=4000)
+    shown:str|None=Field(default=None,max_length=4000)
+    answers:list[ComposeAnswer]=Field(default_factory=list,max_length=20)
+
+def _session_view(session):
+    spec=ProjectSpec.model_validate(session['spec']);pending=questions_for(spec)
+    questions=session.get('questions') or pending[:4]
+    return {**session,'spec':spec.model_dump(mode='json'),'questions':questions,'remaining':len(pending),'preview':preview(spec),**status(),
+            'can_undo':any(t.get('status')=='applied' and t.get('before_spec')!=t.get('after_spec') for t in session.get('turns',[])),
+            'has_changes':spec.model_dump(mode='json')!=session['baseline_spec']}
+
+def _new_compose_session(template):
+    spec=template_spec(template);now=time.time()
+    session={'id':'compose-'+uuid.uuid4().hex[:12],'template':template,'spec':spec.model_dump(mode='json'),'baseline_spec':spec.model_dump(mode='json'),
+             'messages':[],'turns':[],'questions':questions_for(spec)[:4],'mode':'deterministic','status':'active','created_at':now,'updated_at':now}
+    return store().save_compose_session(session)
+
+def _said(spec,answers):
+    """Apply suggested answers deterministically; returns the new spec and how each answer reads in the conversation."""
+    said=[]
+    for a in answers:
+        bank={q['field']:q for q in questions_for(spec)}
+        spec=apply_answer(spec,a.field,a.value)
+        label=next((o['label'] for o in bank.get(a.field,{}).get('options',[]) if o['value']==a.value),None)
+        said.append(f"{bank[a.field]['header'] if a.field in bank else a.field.replace('_',' ').capitalize()}: {(label or str(a.value)).replace(' (Recommended)','')}")
+    return spec,said
+
+def _session_turn_events(session,req):
+    """Apply chosen answers, then run the design agent on any free text, yielding its live events. The last event is
+    {'type': 'saved', 'session'}: the turn is persisted only once it has finished."""
+    spec=ProjectSpec.model_validate(session['spec']);before=spec.model_dump(mode='json')
+    spec,said=_said(spec,req.answers)
+    reply,ai_questions,mode,outcome,tools,steps=None,[],'deterministic','updated',['inspect_project'],[]
+    if said:
+        yield {'type':'step','id':'answers','label':'Applied your answers: '+', '.join(x.split(':')[0] for x in said),'status':'complete'}
+        steps.append({'id':'answers','label':'Applied your answers: '+', '.join(x.split(':')[0] for x in said),'status':'complete'})
+    if req.message:
+        history=[{'role':m['role'],'text':m['text']} for m in session.get('messages',[])]
+        try:
+            out=None
+            for e in run_compose_agent(session['template'],spec,history,req.message):
+                if e['type']=='result':out=e
+                else:yield e
+            spec,reply,ai_questions,mode,outcome,tools,steps=out['spec'],out['reply'],out['questions'],'live',out['outcome'],out['tools'],steps+out['steps']
+        except RuntimeError as e:reply,mode,outcome,tools=str(e),'unavailable','unsupported',['inspect_project','preserve_project']
+        except Exception as e:
+            log.exception('Compose session turn failed');yield {'type':'reply_reset'}
+            reply,mode,outcome,tools=f'The assistant could not process that ({type(e).__name__}). Nothing changed from your message; try rephrasing or pick a suggestion.','error','unsupported',['inspect_project','preserve_project']
+        if mode!='live':yield {'type':'reply_delta','text':reply}
+    elif said:
+        yield {'type':'step','id':'verify','label':'Regenerate the plan and run every check','status':'active'}
+        plan=assess(spec);done={'id':'verify','label':'Regenerated the plan and ran every check','status':'complete' if plan.get('plan_ok') else 'error','detail':plan_summary(plan)}
+        yield {'type':'step',**done};steps.append(done)
+        reply='Noted. '+'; '.join(said)+'. '+plan_summary(plan)+'.';tools+=['update_brief','validate']
+        yield {'type':'reply_delta','text':reply}
+    after=spec.model_dump(mode='json')
+    shown=(req.shown or req.message or ' · '.join(said)).strip()
+    turn_id='turn-'+uuid.uuid4().hex[:10]
+    if shown:session['messages'].append({'role':'user','text':shown,'turn_id':turn_id})
+    if reply:session['messages'].append({'role':'assistant','text':reply,'turn_id':turn_id,'before_spec':before,'after_spec':after,'outcome':outcome,'status':'applied','steps':steps})
+    session['turns'].append({'id':turn_id,'before_spec':before,'after_spec':after,'outcome':outcome,'tools':tools,'status':'applied'})
+    session['spec']=after;session['mode']=mode
+    asked={q['field'] for q in ai_questions};pending=questions_for(spec)
+    session['questions']=(ai_questions+[q for q in pending if q['field'] not in asked])[:4]
+    yield {'type':'saved','session':store().save_compose_session(session)}
+
 @app.get('/api/compose/templates')
 def compose_templates():
     return [{'id':k,'label':t['label'],'use':t['use'],'height':t['height'],'rooms':[{'name':n,'kind':kd,'area':a,'count':c} for n,kd,a,c in t['rooms']]} for k,t in TEMPLATES.items()]
@@ -134,6 +203,58 @@ def compose_step(req:ComposeRequest):
     pending=questions_for(spec)
     questions=(ai_questions+[q for q in pending if q['field'] not in asked])[:4]
     return {'spec':spec,'reply':reply,'questions':questions,'remaining':len(pending),'preview':preview(spec),'mode':mode,**status()}
+@app.post('/api/compose/sessions')
+def create_compose_session(req:ComposeSessionCreate):return _session_view(_new_compose_session(req.template))
+@app.get('/api/compose/sessions/latest')
+def latest_compose_session():
+    session=store().latest_compose_session()
+    return {'session':_session_view(session) if session else None}
+@app.get('/api/compose/sessions/{id}')
+def get_compose_session(id:str):return _session_view(store().get_compose_session(id))
+@app.post('/api/compose/sessions/{id}/turn/stream')
+def stream_compose_session_turn(id:str,req:ComposeSessionTurn):
+    """NDJSON stream of the agent's real work: tool and check steps as they run, the reply as it is written, then the saved session."""
+    def line(e):return json.dumps(e,separators=(',',':'),default=str)+'\n'
+    def generate():
+        try:
+            session=store().get_compose_session(id)
+            if session.get('status')!='active':raise Conflict('This design session is no longer active')
+            for e in _session_turn_events(session,req):
+                if e['type']=='saved':session=e['session']
+                else:yield line(e)
+            yield line({'type':'final','session':_session_view(session)})
+        except Exception as e:
+            log.exception('Compose stream failed');yield line({'type':'error','detail':str(e)})
+    return StreamingResponse(generate(),media_type='application/x-ndjson',headers={'Cache-Control':'no-cache','X-Accel-Buffering':'no'})
+@app.post('/api/compose/sessions/{id}/undo')
+def undo_compose_session(id:str):
+    session=store().get_compose_session(id)
+    turn=next((t for t in reversed(session.get('turns',[])) if t.get('status')=='applied' and t.get('before_spec')!=t.get('after_spec')),None)
+    if not turn:raise Conflict('There is no assistant edit to revert')
+    turn['status']='reverted';session['spec']=turn['before_spec'];session['questions']=questions_for(ProjectSpec.model_validate(session['spec']))[:4]
+    for message in session.get('messages',[]):
+        if message.get('turn_id')==turn['id']:message['status']='reverted'
+    session['messages'].append({'role':'assistant','text':'Reverted the latest assistant edit. The earlier project state is restored.','outcome':'reverted','status':'applied'})
+    return _session_view(store().save_compose_session(session))
+@app.post('/api/compose/sessions/{id}/reject')
+def reject_compose_session(id:str):
+    session=store().get_compose_session(id)
+    session['spec']=session['baseline_spec'];session['questions']=questions_for(ProjectSpec.model_validate(session['spec']))[:4]
+    for turn in session.get('turns',[]):
+        if turn.get('status')=='applied':turn['status']='rejected'
+    for message in session.get('messages',[]):
+        if message.get('turn_id'):message['status']='rejected'
+    session['messages'].append({'role':'assistant','text':'Rejected all assistant edits. The original template has been restored.','outcome':'rejected','status':'applied'})
+    return _session_view(store().save_compose_session(session))
+@app.post('/api/compose/sessions/{id}/build')
+def build_compose_session(id:str):
+    session=store().get_compose_session(id);spec=ProjectSpec.model_validate(session['spec']);b,notes=compose(spec)
+    revision=store().import_model(b,label=f'New project · {b.name}'[:120]);session['status']='built';session['candidate_revision_id']=revision['id']
+    summary=revision['results']['summary']
+    session['messages'].append({'role':'assistant','text':f"Built {b.name} as a candidate revision: {b.width:g} × {b.depth:g} m, {summary['pass']} checks pass, {summary['fail']} fail and {summary['missing_input']} wait for inputs. "
+        'Review it, then apply it. I can keep editing it from the project view.','outcome':'built','candidate_revision_id':revision['id'],'status':'applied'})
+    store().save_compose_session(session)
+    return {'revision':revision,'notes':notes,'thread_id':session['id']}
 @app.post('/api/compose/build')
 def compose_build(req:BuildRequest):
     b,notes=compose(req.spec)
@@ -144,11 +265,28 @@ def import_project(req:ImportRequest):return store().import_model(req.model)
 def import_survey(req:SurveyRequest):
     s=store().get(req.base_revision);b=Building.model_validate(s['model']);b.site.survey=parse_survey(req.csv_text,req.units);validate_site(b.site)
     return store().preview(CommandRequest(base_revision=req.base_revision,command_id=uuid.uuid4().hex,label='Imported survey',commands=[{'type':'set_site','site':b.site.model_dump()}]))
+def _thread(session):
+    keep=('role','text','outcome','candidate_revision_id')
+    return {'id':session['id'],'name':(session.get('spec') or {}).get('name') or 'Project conversation','status':session['status'],
+            'messages':[{k:m[k] for k in keep if m.get(k) is not None} for m in session.get('messages',[])][-40:]}
+def _new_thread():
+    now=time.time()
+    return store().save_compose_session({'id':'compose-'+uuid.uuid4().hex[:12],'template':None,'spec':None,'messages':[],'turns':[],'status':'project','created_at':now,'updated_at':now})
+@app.get('/api/assistant/thread')
+def assistant_thread():
+    """The latest project conversation: a built new-project session continues here, so the chat follows the project."""
+    session=store().latest_compose_session(('built','project'))
+    return {'thread':_thread(session) if session else None}
+@app.post('/api/assistant/thread')
+def new_assistant_thread():return {'thread':_thread(_new_thread())}
 @app.post('/api/ai')
 def ai(req:AIRequest):
     s=store().get(req.revision_id)
+    thread=store().get_compose_session(req.thread_id) if req.thread_id else None
+    if thread and thread.get('status') not in ('built','project'):raise Conflict('That conversation is still designing a new project; build it first')
+    history=[{'role':m['role'],'text':m['text']} for m in (thread or {}).get('messages',[]) if m.get('text')]
     if req.attachment:req.attachment.raw()  # malformed uploads are a 422, not a model failure
-    try:plan=interpret(req,s)
+    try:plan=interpret(req,s,history)
     except RuntimeError as e:return JSONResponse(status_code=503,content={'detail':str(e),'mode':'unavailable'})
     except Exception as e:
         log.exception('Assistant request failed')
@@ -162,6 +300,11 @@ def ai(req:AIRequest):
     elif plan.action=='rules':response['evidence']={'rules':RULES,'checks':s['results']['checks']}
     elif plan.action=='compare':response['evidence']=comparison(before=store().state()['head'],after=req.revision_id)
     elif plan.action=='inspect':response['evidence']={'summary':s['results']['summary'],'checks':[c for c in s['results']['checks'] if not req.selected_id or req.selected_id in c['objects']],'scope':s['results']['structure'].get('scope')}
+    thread=thread or _new_thread()
+    candidate=response['candidate']['id'] if response['candidate'] and response['candidate'].get('status')=='candidate' else None
+    thread['messages']+=[{'role':'user','text':(req.message+(f' [attached {req.attachment.name}]' if req.attachment else ''))[:2000]},
+                         {'role':'assistant','text':' '.join(x for x in (plan.explanation,plan.clarification) if x)[:2000],'outcome':plan.action,'candidate_revision_id':candidate}]
+    response['thread']=_thread(store().save_compose_session(thread))
     return response
 
 @app.get('/api/export/{id}/project.json')

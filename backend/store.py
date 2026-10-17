@@ -17,6 +17,7 @@ class LocalStore:
             db.execute('CREATE TABLE IF NOT EXISTS snapshots(id TEXT PRIMARY KEY, data TEXT NOT NULL)')
             db.execute('CREATE TABLE IF NOT EXISTS state(id INTEGER PRIMARY KEY CHECK(id=1), data TEXT NOT NULL)')
             db.execute('CREATE TABLE IF NOT EXISTS commands(id TEXT PRIMARY KEY, fingerprint TEXT NOT NULL, revision TEXT NOT NULL)')
+            db.execute('CREATE TABLE IF NOT EXISTS compose_sessions(id TEXT PRIMARY KEY, updated_at REAL NOT NULL, data TEXT NOT NULL)')
     @contextmanager
     def db(self):
         db=sqlite3.connect(self.path,timeout=30);db.row_factory=sqlite3.Row
@@ -104,3 +105,16 @@ class LocalStore:
         s=self.make_snapshot(Building.model_validate(base['model']),id,'Recomputed analysis',[],['all'],base['fork_head'] if base['status']=='candidate' else id)
         with self.db() as db:db.execute('INSERT INTO snapshots VALUES (?,?)',(s['id'],json.dumps(s)))
         return s
+    def save_compose_session(self,session):
+        session={**session,'updated_at':time.time()}
+        with self.db() as db:
+            db.execute('INSERT OR REPLACE INTO compose_sessions VALUES (?,?,?)',(session['id'],session['updated_at'],json.dumps(session)))
+        return session
+    def get_compose_session(self,id):
+        with self.db() as db:r=db.execute('SELECT data FROM compose_sessions WHERE id=?',(id,)).fetchone()
+        if r is None:raise KeyError('Design session not found')
+        return json.loads(r['data'])
+    def latest_compose_session(self,statuses=('active',)):
+        marks=','.join('?'*len(statuses))
+        with self.db() as db:r=db.execute(f"SELECT data FROM compose_sessions WHERE json_extract(data,'$.status') IN ({marks}) ORDER BY updated_at DESC LIMIT 1",tuple(statuses)).fetchone()
+        return json.loads(r['data']) if r else None

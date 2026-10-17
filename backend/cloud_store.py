@@ -2,7 +2,7 @@
 One isolated deployment/workspace. Cloud Run IAM is the access boundary.
 No project data is ever sent here unless BUILDGRAPH_STORAGE=google.
 """
-import os,json,uuid
+import os,json,uuid,time
 from google.cloud import firestore,storage
 from .store import LocalStore,Conflict
 from .domain import digest,Building,apply_commands
@@ -76,3 +76,16 @@ class GoogleStore(LocalStore):
         state=self.state();s=self.make_snapshot(model,state['head'],label,[{'type':'import_native_project'}],['all'],state['head']);self._write(s);return s
     def rerun(self,id):
         base=self.get(id);s=self.make_snapshot(Building.model_validate(base['model']),id,'Recomputed analysis',[],['all'],base['fork_head'] if base['status']=='candidate' else id);self._write(s);return s
+    def save_compose_session(self,session):
+        session={**session,'updated_at':time.time()}
+        self.root.collection('compose_sessions').document(session['id']).set(session)
+        return session
+    def get_compose_session(self,id):
+        if not id.startswith('compose-') or '/' in id:raise KeyError('Invalid design session')
+        doc=self.root.collection('compose_sessions').document(id).get()
+        if not doc.exists:raise KeyError('Design session not found')
+        return doc.to_dict()
+    def latest_compose_session(self,statuses=('active',)):
+        # Ordered on one field and filtered here: an equality filter plus order_by would need a composite index.
+        docs=self.root.collection('compose_sessions').order_by('updated_at',direction=firestore.Query.DESCENDING).limit(50).stream()
+        return next((d.to_dict() for d in docs if d.to_dict().get('status') in statuses),None)
