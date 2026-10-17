@@ -4,6 +4,7 @@ from pathlib import Path
 from fastapi import FastAPI,Request
 from fastapi.responses import JSONResponse,Response,HTMLResponse,StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.gzip import GZipMiddleware,DEFAULT_EXCLUDED_CONTENT_TYPES
 from pydantic import ValidationError,Field
 from .domain import Building,CommandRequest,FireProtection,Model,digest
 from .store import LocalStore,Conflict
@@ -23,6 +24,8 @@ from .agent import run_compose_agent,assess,plan_summary
 from typing import Literal,Any
 
 app=FastAPI(title='BuildGraph',version='0.1.0')
+# JSON, JS and CSS shrink ~70-85% gzipped. The design agent's ndjson stream stays uncompressed so its events arrive as sent.
+app.add_middleware(GZipMiddleware,minimum_size=1000,exclude_content_types=DEFAULT_EXCLUDED_CONTENT_TYPES+('application/x-ndjson',))
 logging.basicConfig(level=logging.INFO,format='%(levelname)s %(name)s: %(message)s')
 log=logging.getLogger('buildgraph')
 _store=None
@@ -368,4 +371,10 @@ def report(id:str):
     return f'''<!doctype html><html><head><title>BuildGraph review · {esc(s['model']['name'])}</title><style>body{{font:14px system-ui;max-width:1000px;margin:40px auto;color:#203b34}}h1{{font-size:32px}}table{{border-collapse:collapse;width:100%}}th,td{{padding:8px;text-align:left;border-bottom:1px solid #ddd}}td{{vertical-align:top}}code{{overflow-wrap:anywhere}}@media print{{button{{display:none}}body{{margin:0}}thead{{display:table-header-group}}tr{{break-inside:avoid}}}}</style></head><body><button onclick="window.print()">Print review</button><h1>BuildGraph / {esc(s['model']['name'])}</h1><p>Revision {esc(id)} · {esc(s['status'])} · Synthetic example / preliminary planning</p><p>{esc(r['structure'].get('scope','Analysis missing inputs'))}</p><p>Input hash <code>{esc(s['input_hash'])}</code><br>Result hash <code>{esc(s['result_hash'])}</code></p><h2>Estimate · ₱{r['quantities']['total']:,.2f}</h2><p>{esc(r['quantities']['catalog'])}</p><table><thead><tr><th>Item</th><th>Net</th><th>Purchased</th><th>Estimate</th></tr></thead><tbody>{rows}</tbody></table><h2>Exclusions</h2><p>{esc('; '.join(r['quantities']['exclusions']))}</p><h2>Checks & coverage</h2><table><thead><tr><th>Rule</th><th>Status</th><th>Evidence</th></tr></thead><tbody>{checks}</tbody></table><h2>Engineering inputs & provenance</h2><pre>{esc(json.dumps(s['model']['engineering'],indent=2))}</pre><p>Professional review is required for construction and approval. Partial coverage is not whole-building certification.</p></body></html>'''
 
 static=Path(__file__).resolve().parent.parent/'frontend'/'dist'
-if static.exists():app.mount('/',StaticFiles(directory=static,html=True),name='frontend')
+class Frontend(StaticFiles):
+    """Vite's hashed /assets never change, so browsers keep them for a year; index.html revalidates so a deploy shows at once."""
+    async def get_response(self,path,scope):
+        r=await super().get_response(path,scope)
+        r.headers['Cache-Control']='public, max-age=31536000, immutable' if path.startswith('assets/') and r.status_code in (200,304) else 'no-cache'
+        return r
+if static.exists():app.mount('/',Frontend(directory=static,html=True),name='frontend')
