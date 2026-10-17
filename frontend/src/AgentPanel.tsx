@@ -1,8 +1,9 @@
-import {useEffect, useRef} from 'react';
-import {ArrowRight, AtSign, CheckCircle2, FileText, GitBranch, Loader2, Paperclip, Plus, Send, Sparkles, X} from 'lucide-react';
+import {useEffect, useRef, useState} from 'react';
+import {ArrowRight, AtSign, Check, CheckCircle2, FileText, GitBranch, Loader2, Paperclip, Plus, Send, Sparkles, X} from 'lucide-react';
 import {money} from './api';
+import {composeDecisionReply, hasAllDecisions, recommendedDecisions, usesRecommendations, type DecisionQuestion, type DecisionSelection} from './agentDecisions';
 
-export type Thread = {id: string; name: string; messages: {role: 'user' | 'assistant'; text: string; outcome?: string; candidate_revision_id?: string}[]};
+export type Thread = {id: string; name: string; messages: {role: 'user' | 'assistant'; text: string; outcome?: string; candidate_revision_id?: string; questions?: DecisionQuestion[]}[]};
 export type Sketch = {name: string; mime_type: string; data: string; url: string};
 type Suggestion = {label: string; run: () => void; disabled?: boolean};
 
@@ -13,13 +14,16 @@ export function AgentPanel({provider, model, visionModel, contextName, revisionI
   onMessage, onAsk, onAttach, onRemoveSketch, onNewThread, onReview, onClose}: {
   provider: string | null; model: string | null; visionModel: string | null; contextName: string; revisionId: string; thread: Thread | null;
   pending: string; working: string; reply: any; message: string; sketch: Sketch | null; suggestions: Suggestion[];
-  onMessage: (text: string) => void; onAsk: () => void; onAttach: (file?: File) => void; onRemoveSketch: () => void; onNewThread: () => void;
+  onMessage: (text: string) => void; onAsk: (message?: string) => void; onAttach: (file?: File) => void; onRemoveSketch: () => void; onNewThread: () => void;
   onReview: (revisionId: string) => void; onClose: () => void;
 }) {
   const scroll = useRef<HTMLDivElement>(null), input = useRef<HTMLTextAreaElement>(null);
+  const [decisions, setDecisions] = useState<DecisionSelection>({});
   const messages = thread?.messages ?? [];
+  const lastMessage = messages.at(-1), questions = lastMessage?.role === 'assistant' ? lastMessage.questions ?? [] : [];
   useEffect(() => {input.current?.focus();}, []);
   useEffect(() => {scroll.current?.scrollTo({top: scroll.current.scrollHeight, behavior: 'smooth'});}, [messages.length, pending, working]);
+  useEffect(() => {setDecisions(recommendedDecisions(questions));}, [thread?.id, messages.length]);
   const canSend = !!provider && !working && (!!message.trim() || !!sketch);
   const evidence = reply?.evidence; const summary = evidence?.summary; const delta = evidence?.comparison?.cost_delta;
   return <aside className="agent-panel" aria-label="Design agent">
@@ -35,7 +39,25 @@ export function AgentPanel({provider, model, visionModel, contextName, revisionI
       </div>}
       {messages.map((m, i) => <div key={i} className={'agent-msg ' + m.role}>
         {m.role === 'assistant' && <span className="agent-msg-icon">{m.outcome === 'built' ? <CheckCircle2 size={12}/> : <Sparkles size={12}/>}</span>}
-        <div><p>{m.text}</p>{m.candidate_revision_id && <button className="agent-candidate" onClick={() => onReview(m.candidate_revision_id!)}><GitBranch size={12}/> Review candidate on the plan <ArrowRight size={12}/></button>}</div>
+        <div><p>{m.text}</p>{m.candidate_revision_id && <button className="agent-candidate" onClick={() => onReview(m.candidate_revision_id!)}><GitBranch size={12}/> Review candidate on the plan <ArrowRight size={12}/></button>}
+          {i === messages.length - 1 && m.role === 'assistant' && questions.length > 0 && <div className="agent-decisions">
+            <div className="agent-decisions-head"><strong>{questions.length === 1 ? 'One decision needed' : `${questions.length} decisions needed`}</strong><span>Recommended choices are preselected</span></div>
+            {questions.map((question, questionIndex) => <fieldset key={question.id} className="agent-decision">
+              <legend><span>{questionIndex + 1}</span>{question.question}</legend>
+              <div role="radiogroup" aria-label={question.question}>{question.options.map((option, optionIndex) => {
+                const recommended = option.recommended || (!question.options.some(choice => choice.recommended) && optionIndex === 0);
+                const selected = decisions[question.id] === option.response;
+                return <button type="button" role="radio" aria-checked={selected} disabled={!!working} key={option.response} className={'agent-choice' + (selected ? ' selected' : '')}
+                  onClick={() => setDecisions(current => ({...current, [question.id]: option.response}))}>
+                  <span className="agent-choice-mark">{selected && <Check size={12}/>}</span><span><strong>{option.label}</strong>{option.description && <small>{option.description}</small>}</span>{recommended && <em>Recommended</em>}
+                </button>;
+              })}</div>
+            </fieldset>)}
+            <button type="button" className="agent-decision-send" disabled={!!working || !hasAllDecisions(questions, decisions)} onClick={() => onAsk(composeDecisionReply(questions, decisions))}>
+              {usesRecommendations(questions, decisions) ? 'Send recommended decisions' : 'Send decisions'}<ArrowRight size={13}/>
+            </button>
+          </div>}
+        </div>
       </div>)}
       {pending && <div className="agent-msg user"><div><p>{pending}</p></div></div>}
       {working && <div className="agent-msg assistant working"><span className="agent-msg-icon"><Loader2 className="spin" size={12}/></span><div><p>{working}</p><small>Typed commands are validated and dry-run against the layout checks before you see them.</small></div></div>}

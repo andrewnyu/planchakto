@@ -303,7 +303,7 @@ def import_survey(req:SurveyRequest):
     s=store().get(req.base_revision);b=Building.model_validate(s['model']);b.site.survey=parse_survey(req.csv_text,req.units);validate_site(b.site)
     return store().preview(CommandRequest(base_revision=req.base_revision,command_id=uuid.uuid4().hex,label='Imported survey',commands=[{'type':'set_site','site':b.site.model_dump()}]))
 def _thread(session):
-    keep=('role','text','outcome','candidate_revision_id')
+    keep=('role','text','outcome','candidate_revision_id','questions')
     return {'id':session['id'],'name':(session.get('spec') or {}).get('name') or 'Project conversation','status':session['status'],
             'messages':[{k:m[k] for k in keep if m.get(k) is not None} for m in session.get('messages',[])][-40:]}
 def _new_thread():
@@ -340,7 +340,8 @@ def ai(req:AIRequest):
     thread=thread or _new_thread()
     candidate=response['candidate']['id'] if response['candidate'] and response['candidate'].get('status')=='candidate' else None
     thread['messages']+=[{'role':'user','text':(req.message+(f' [attached {req.attachment.name}]' if req.attachment else ''))[:2000]},
-                         {'role':'assistant','text':' '.join(x for x in (plan.explanation,plan.clarification) if x)[:2000],'outcome':plan.action,'candidate_revision_id':candidate}]
+                         {'role':'assistant','text':' '.join(x for x in (plan.explanation,plan.clarification) if x)[:2000],'outcome':plan.action,'candidate_revision_id':candidate,
+                          'questions':[q.model_dump() for q in plan.questions]}]
     response['thread']=_thread(store().save_compose_session(thread))
     return response
 

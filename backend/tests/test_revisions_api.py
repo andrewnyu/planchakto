@@ -113,6 +113,29 @@ def test_ai_plan_evaluation_contract(action,commands,revision,valid):
     else:
         with pytest.raises(ValueError):validate_plan(plan,req)
 
+def test_clarification_questions_are_typed_and_persisted(client,monkeypatch):
+    head=client.get('/api/project').json()['state']['head']
+    questions=[{'id':'distance','question':'How far should the corridor move?','options':[
+        {'label':'Move 1.5 m','description':'Creates more living space','response':'Move the corridor down by 1.5 m.','recommended':True},
+        {'label':'Move 1.0 m','response':'Move the corridor down by 1.0 m.'},
+    ]}]
+    monkeypatch.setattr('backend.main.interpret',lambda *args:AIPlan(revision_id=head,action='clarify',explanation='I need one decision.',questions=questions))
+    response=client.post('/api/ai',json={'revision_id':head,'message':'Move the corridor down'})
+    assert response.status_code==200
+    saved=response.json()['interpretation']['questions']
+    assert saved[0]['id']=='distance' and saved[0]['options'][0]['recommended'] is True
+    assert saved[0]['options'][1]['description']=='' and saved[0]['options'][1]['recommended'] is False
+    assert response.json()['thread']['messages'][-1]['questions']==saved
+
+def test_questions_are_limited_to_clarifications_and_one_recommendation():
+    req=AIRequest(revision_id='a',message='test')
+    question={'id':'distance','question':'How far?','options':[
+        {'label':'One','response':'Move one metre.','recommended':True},
+        {'label':'Two','response':'Move two metres.','recommended':True},
+    ]}
+    with pytest.raises(ValueError):validate_plan(AIPlan(revision_id='a',action='inspect',explanation='x',questions=[question]),req)
+    with pytest.raises(ValueError):validate_plan(AIPlan(revision_id='a',action='clarify',explanation='x',questions=[question]),req)
+
 import json,backend.ai as ai
 AI_ENV=('GEMINI_API_KEY','GEMINI_MODEL','GOOGLE_CLOUD_PROJECT','OPENROUTER_API_KEY','OPENROUTER_MODEL','BUILDGRAPH_AI_PROVIDER')
 @pytest.mark.parametrize('env,expected',[
