@@ -25,7 +25,7 @@ const steps=[
 const planStages=['Site','Brief','Layout','Systems','Cost','Export'];
 const quickChecks:{id:Discipline;label:string;icon:typeof Flame}[]=[{id:'structure',label:'Structure',icon:Columns3},{id:'fire',label:'Fire protection',icon:Flame},{id:'plumbing',label:'Plumbing',icon:Droplets},{id:'electrical',label:'Electrical',icon:Zap}];
 
-export function Splash({project,onNewProject,onStart,onAssistant,onCheck,onSample}:{project:Project|null;onNewProject:()=>void;onStart:()=>void;onAssistant:()=>void;onCheck:(discipline?:Discipline)=>void;onSample:(discipline:'fire'|'plumbing')=>void}){
+export function Splash({project,onNewProject,onStart,onAssistant,onCheck,onSample}:{project:Project|null;onNewProject:()=>void;onStart:()=>void;onAssistant:()=>void;onCheck:(discipline?:Discipline)=>void;onSample:(discipline:'fire')=>void}){
  const b=project?.accepted.model,r=project?.accepted.results;
  return <div className="splash">
   <header className="splash-bar"><div className="splash-brand"><span className="brand-mark"><Box size={22} strokeWidth={1.65}/></span><strong>Planchakto</strong><span className="splash-tag">BuildGraph engine</span></div><button className="button primary" onClick={onStart}>Open workspace <ArrowRight size={14}/></button></header>
@@ -55,9 +55,9 @@ export function Splash({project,onNewProject,onStart,onAssistant,onCheck,onSampl
      <span className="path-eyebrow"><FileCheck2 size={14}/> Quick check</span>
      <h2>Check a plan</h2>
      <p>Already have drawings? Screen one system and see each finding with its evidence. Continue into the full plan when you are ready.</p>
-     <div className="path-checks">{quickChecks.map(c=><button key={c.id} onClick={()=>onCheck(c.id)}><c.icon size={15}/>{c.label}{c.id!=='structure'&&c.id!=='fire'&&<small>soon</small>}<ArrowUpRight size={12}/></button>)}</div>
-     <div className="path-samples"><span>No drawings to hand?</span><button className="text-button" onClick={()=>onCheck('structure')}><Play size={12}/> Framing plan sample</button><button className="text-button" onClick={()=>onCheck('fire')}><Play size={12}/> Floor plan sample</button><button className="text-button" onClick={()=>onSample('fire')}><Play size={12}/> Fire on the demo</button><button className="text-button" onClick={()=>onSample('plumbing')}><Play size={12}/> Plumbing on the demo</button></div>
-     <p className="path-note">Gemini reads a structural framing plan or a floor plan for fire and egress into a separate check; your projects and the demo are never changed. Plumbing and electrical drawing checks are coming next.</p>
+     <div className="path-checks">{quickChecks.map(c=><button key={c.id} onClick={()=>onCheck(c.id)}><c.icon size={15}/>{c.label}<ArrowUpRight size={12}/></button>)}</div>
+     <div className="path-samples"><span>No drawings to hand?</span><button className="text-button" onClick={()=>onCheck('structure')}><Play size={12}/> Framing sample</button><button className="text-button" onClick={()=>onCheck('fire')}><Play size={12}/> Fire sample</button><button className="text-button" onClick={()=>onCheck('plumbing')}><Play size={12}/> Plumbing sample</button><button className="text-button" onClick={()=>onCheck('electrical')}><Play size={12}/> Electrical sample</button><button className="text-button" onClick={()=>onSample('fire')}><Play size={12}/> Fire on the demo</button></div>
+     <p className="path-note">Each drawing is screened on its own. Plumbing and electrical are deliberately limited to plan connectivity, gravity fall and load arithmetic; omitted design and coordination work is listed as not checked.</p>
     </article>
    </section>
    <section className="splash-section">

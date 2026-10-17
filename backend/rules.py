@@ -55,7 +55,7 @@ RULES=[
 
 STRUCTURAL={'SLS','ELASTIC','BEARING','WIND','SEISMIC-V','DRIFT','COLUMN','FRAME-MEMBER','FOOT-LATERAL'}
 FIRE={'FIRE-OCCLOAD','FIRE-EXITS','FIRE-TRAVEL','FIRE-DEADEND','FIRE-COMMON','FIRE-CAPACITY','FIRE-CORRIDOR','FIRE-SPRINKLER','FIRE-ALARM','FIRE-EMLIGHT','FIRE-SIGNS','FIRE-EXT','FIRE-SCOPE'}
-SCOPED={'structure':STRUCTURAL,'fire':FIRE}
+SCOPED={'structure':STRUCTURAL,'fire':FIRE,'plumbing':{'ROUTE','DRAIN'},'electrical':{'ROUTE','ELECTRICAL'}}
 def in_scope(rule,scope):return scope is None or rule=='PH-CODE' or rule in SCOPED.get(scope,())
 def evaluate_rules(b,structure,layout,routing,fitout,rev,solar=None,fire=None,lateral=None,scope=None):
     results=[]
@@ -73,7 +73,10 @@ def evaluate_rules(b,structure,layout,routing,fitout,rev,solar=None,fire=None,la
     for route in routing['routes']:
         add('DRAIN' if route['kind']=='drain' else 'ROUTE',route['status'],[route['id'],route['source_id']],route['reason'],{'length_m':route['length'],'slope':route['slope'],'available_fall_m':route['fall'],'required_slope':b.engineering.drain_slope if route['kind']=='drain' else None})
     add('FITOUT',fitout['status'],[f.id for f in b.furniture],'; '.join(i['reason'] for i in fitout['issues']) or 'All modeled furniture bodies and front access strips clear',{'scope':fitout['scope']})
-    for c in routing['circuits']:add('ELECTRICAL',c['status'],c['equipment_ids'],f"{c['connected_W']} W connected; {c['current_A']} A calculated. {c['coverage']}",c)
+    for c in routing['circuits']:
+        evidence=(f"Connected load is missing because one or more equipment ratings were not supplied. {c['coverage']}" if c['status']=='missing_input' else
+                  f"{c['connected_W']} W connected; {c['current_A']} A calculated. {c['coverage']}")
+        add('ELECTRICAL',c['status'],c['equipment_ids'],evidence,c)
     if solar and solar['enabled']:
         for c in solar['checks']:add(c['rule'],c['status'],[m['id'] for m in solar['layout']['modules']] or ['solar-array'],c['evidence'],c['inputs'])
     if fire and fire['enabled']:
@@ -81,7 +84,10 @@ def evaluate_rules(b,structure,layout,routing,fitout,rev,solar=None,fire=None,la
     if lateral and lateral.get('enabled'):
         for c in lateral['checks']:add(c['rule'],c['status'],c['objects'],f"{c['evidence']} [{c['clause']}]" if c['clause'] else c['evidence'],c['inputs'])
     add('PH-CODE','unsupported',[b.id],'No Philippine statutory rules are verified. This is preliminary planning and review support, requiring appropriate professional review for construction and approval.')
-    gaps=[] if scope=='fire' else (['Torsion, orthogonal effects, P-Δ, irregular and multi-storey buildings, dynamic analysis','Connections, base plates and anchor bolts','Foundation settlement, punching shear and reinforcement'] if lateral and lateral.get('enabled') else
+    gaps=([] if scope=='fire' else
+          ['Plumbing hydraulic sizing, venting, traps, cleanouts and pipe diameter adequacy'] if scope=='plumbing' else
+          ['Electrical protection, conductor sizing, voltage drop, fault current and grounding'] if scope=='electrical' else
+          ['Torsion, orthogonal effects, P-Δ, irregular and multi-storey buildings, dynamic analysis','Connections, base plates and anchor bolts','Foundation settlement, punching shear and reinforcement'] if lateral and lateral.get('enabled') else
           ['Whole-building stability, wind and seismic','Steel column buckling and connections','Foundation uplift, eccentric contact, settlement, sliding, overturning, punching and reinforcement'])
     # A scoped check lists only its own discipline's gaps; other disciplines appear once in the result's coverage.
     for name in gaps+([] if scope else ['Electrical protection, conductor sizing and voltage drop','Plumbing hydraulic sizing, venting and pipe diameter adequacy']):

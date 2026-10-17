@@ -174,10 +174,62 @@ def fire_reading(boxes):
         'provisions':[{'kind':'exit_signs','provided':True,'text':'ILLUMINATED EXIT SIGN','box':nbox(boxes['signs'])}],
         'outside_supported':[],'unread':[]}
 
+# ---------------------------------------------------------------- limited plumbing / electrical plan screens
+PLUMBING_POINTS=[('sink','Pantry sink','PANTRY',8,9.2),('wc','WC-1','TOILET',11,9.2),('basin','Lavatory','TOILET',12,9.2)]
+ELECTRICAL_POINTS=[('Printer','OFFICE A',3,2.7,800,'C1'),('Workstations','OFFICE B',9,2.7,2400,'C1'),('Conference display','CONFERENCE',16,2.7,500,'C2'),('Pantry load','PANTRY',8,9.5,None,'C2')]
+SERVICE_CONNECTIONS={'water_connection':(20,2),'drain_connection':(20,10),'panel':(1,6)}
+
+def draw_service(discipline):
+    img=Image.new('RGB',(W,H),'white');d=ImageDraw.Draw(img);d.rectangle([20,20,W-20,H-20],outline=INK,width=3)
+    d.rectangle([fx(0),fy(0),fx(FW),fy(FD)],fill=INK)
+    for name,x,y,w,h in ROOMS:
+        a,b,c,e=inner(x,y,x+w,y+h);d.rectangle([fx(a),fy(b),fx(c),fy(e)],fill='white')
+        d.text((fx(x+w/2),fy(y+h/2)),name,fill=INK,font=font(15),anchor='mm')
+    points=[]
+    if discipline=='plumbing':
+        for kind,name,room,x,y in PLUMBING_POINTS:
+            d.ellipse([fx(x)-12,fy(y)-12,fx(x)+12,fy(y)+12],outline=(38,121,133),width=3);d.text((fx(x),fy(y)),{'sink':'S','wc':'WC','basin':'LAV'}[kind],fill=(38,121,133),font=font(9),anchor='mm')
+            d.text((fx(x)+18,fy(y)-14),name,fill=INK,font=font(12));points.append({'kind':kind,'name':name,'room':room,'point':norm(fy(y),fx(x)),'watts':None,'circuit':None,'text':name})
+        for kind,label in [('water_connection','WATER SERVICE'),('drain_connection','SANITARY OUT')]:
+            x,y=SERVICE_CONNECTIONS[kind];d.rectangle([fx(x)-10,fy(y)-10,fx(x)+10,fy(y)+10],fill=(38,121,133));d.text((fx(x)-16,fy(y)),label,fill=(38,121,133),font=font(12),anchor='rm')
+            points.append({'kind':kind,'name':label,'room':None,'point':norm(fy(y),fx(x)),'watts':None,'circuit':None,'text':label})
+        notes=['AVAILABLE FALL TO SANITARY OUT: 0.60 m','MINIMUM DRAIN SLOPE: 1.0%','PIPE SIZING, VENTS, TRAPS AND CLEANOUTS NOT SHOWN']
+    else:
+        for name,room,x,y,watts,circuit in ELECTRICAL_POINTS:
+            d.rectangle([fx(x)-11,fy(y)-11,fx(x)+11,fy(y)+11],outline=(122,87,163),width=3);d.text((fx(x),fy(y)),'E',fill=(122,87,163),font=font(10),anchor='mm')
+            label=f'{name} {watts:g} W {circuit}' if watts is not None else f'{name} {circuit} (WATTS NOT SHOWN)';d.text((fx(x)+17,fy(y)-14),label,fill=INK,font=font(11))
+            points.append({'kind':'equipment','name':name,'room':room,'point':norm(fy(y),fx(x)),'watts':watts,'circuit':circuit,'text':label})
+        x,y=SERVICE_CONNECTIONS['panel'];d.rectangle([fx(x)-15,fy(y)-18,fx(x)+15,fy(y)+18],fill=(122,87,163));d.text((fx(x),fy(y)),'LP',fill='white',font=font(11),anchor='mm')
+        points.append({'kind':'panel','name':'Panel LP','room':'CORRIDOR','point':norm(fy(y),fx(x)),'watts':None,'circuit':None,'text':'PANEL LP'})
+        notes=['C1 LIGHTING / GENERAL LOADS: 230 V, PF 0.90, DEMAND 0.80','C2 DEDICATED LOADS: 230 V, PF 0.95, DEMAND 1.00','WIRE SIZE, BREAKERS, VOLTAGE DROP AND FAULT CURRENT NOT SHOWN']
+    top=fy(0)-35;d.line([(fx(0),top),(fx(FW),top)],fill=INK);d.text(((fx(0)+fx(FW))/2,top-9),f'{FW*1000}',fill=INK,font=font(15),anchor='ms')
+    left=fx(0)-40;d.line([(left,fy(0)),(left,fy(FD))],fill=INK);d.text((left-8,(fy(0)+fy(FD))/2),f'{FD*1000}',fill=INK,font=font(15),anchor='rm')
+    title='PLUMBING & SANITARY PLAN' if discipline=='plumbing' else 'ELECTRICAL LOAD PLAN';d.text(((fx(0)+fx(FW))/2,fy(FD)+70),title,fill=INK,font=font(24),anchor='ms')
+    x,y=1420,100;d.text((x,y),'PLAN NOTES',fill=INK,font=font(20));y+=42
+    for note in notes:
+        for line in textwrap.wrap(note,34):d.text((x,y),line,fill=INK,font=font(14));y+=21
+        y+=12
+    d.rectangle([1410,H-250,W-20,H-20],outline=INK,width=2)
+    for k,(text,size) in enumerate([('SAMPLE OFFICE ANNEX',20),(title,17),(f'SHEET {"P" if discipline=="plumbing" else "E"}-101',18),('SYNTHETIC SAMPLE - NOT A REAL PROJECT',13),('PLANCHAKTO QUICK CHECK',13)]):d.text((1430,H-230+k*40),text,fill=RED if k==3 else INK,font=font(size))
+    return img,points
+
+def service_reading(discipline,points):
+    circuits=[] if discipline=='plumbing' else [
+        {'id':'C1','name':'Lighting / general loads','voltage':230,'power_factor':.9,'demand_factor':.8},
+        {'id':'C2','name':'Dedicated loads','voltage':230,'power_factor':.95,'demand_factor':1.0}]
+    return {'sheet_kind':f'{discipline}_plan','discipline':discipline,'title':f'{discipline.title()} plan — Sample office annex','units':'mm','storeys':1,
+        'footprint':{'width':FW*1000,'depth':FD*1000,'box':nbox((fy(0),fx(0),fy(FD),fx(FW)))},
+        'rooms':[{'name':n,'box':nbox((fy(b),fx(a),fy(e),fx(c)))} for n,*r in ROOMS for a,b,c,e in [inner(r[0],r[1],r[0]+r[2],r[1]+r[3])]],
+        'points':points,'circuits':circuits,'drain_fall_m':.6 if discipline=='plumbing' else None,'drain_slope':.01 if discipline=='plumbing' else None,
+        'outside_supported':[],'unread':['Pantry load watts are not shown'] if discipline=='electrical' else []}
+
 if __name__=='__main__':
     OUT.mkdir(parents=True,exist_ok=True);img,cols,boxes=draw()
     img.save(OUT/'structure-sample.png',optimize=True)
     (OUT/'structure-sample.sheet.json').write_text(json.dumps(reading(cols,boxes),indent=1)+'\n')
     img,boxes=draw_fire();img.save(OUT/'fire-sample.png',optimize=True)
     (OUT/'fire-sample.sheet.json').write_text(json.dumps(fire_reading(boxes),indent=1)+'\n')
-    print('wrote',*(OUT/f'{k}-sample{e}' for k in ('structure','fire') for e in ('.png','.sheet.json')))
+    for discipline in ('plumbing','electrical'):
+        img,points=draw_service(discipline);img.save(OUT/f'{discipline}-sample.png',optimize=True)
+        (OUT/f'{discipline}-sample.sheet.json').write_text(json.dumps(service_reading(discipline,points),indent=1)+'\n')
+    print('wrote',*(OUT/f'{k}-sample{e}' for k in ('structure','fire','plumbing','electrical') for e in ('.png','.sheet.json')))

@@ -264,11 +264,11 @@ def compose_build(req:BuildRequest):
     b,notes=compose(req.spec)
     return {'revision':store().import_model(b,label=f'New project · {b.name}'[:120]),'notes':notes}
 class QuickCheckRequest(Model):
-    discipline:Literal['structure','fire']='structure'
+    discipline:Literal['structure','fire','plumbing','electrical']='structure'
     attachment:Attachment
     page:int=Field(default=0,ge=0,le=500)
 class QuickSampleRequest(Model):
-    discipline:Literal['structure','fire']='structure'
+    discipline:Literal['structure','fire','plumbing','electrical']='structure'
     live:bool=False
 def _quick_id(id:str):
     if not quickcheck.ID.match(id):raise KeyError('Quick check not found')
@@ -279,7 +279,7 @@ def _reading(fn):
     except RuntimeError as e:return JSONResponse(status_code=503,content={'detail':str(e),'mode':'unavailable'})
     except ValidationError:
         log.exception('Sheet reading did not validate')
-        return JSONResponse(status_code=502,content={'detail':'The drawing could not be read into a structural grid. Try a clearer sheet or a single page.','mode':'error'})
+        return JSONResponse(status_code=502,content={'detail':'The drawing could not be read into the selected check schema. Try a clearer sheet or a single page.','mode':'error'})
     except (ValueError,KeyError):raise
     except Exception as e:
         log.exception('Quick check reading failed')

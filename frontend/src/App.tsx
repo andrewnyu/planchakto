@@ -17,7 +17,7 @@ import {QuickCheck} from './QuickCheck';
 import {type Discipline, type StageId} from './planning';
 import './workflow.css';
 const Model3D=lazy(()=>import('./Model3D'));
-type SampleDiscipline='plumbing'|'fire';
+type SampleDiscipline='fire';
 const clearHash=()=>{try{history.replaceState(null,'',location.pathname+location.search)}catch{}};
 const layerNames:Record<Layer,string>={architecture:'Architecture',structure:'Structure',electrical:'Electrical',plumbing:'Plumbing',furniture:'Fit-out',solar:'Solar PV',fire:'Fire protection',terrain:'Site & terrain'};
 const icons={architecture:Home,structure:Columns3,electrical:Zap,plumbing:Droplets,furniture:Armchair,solar:Sun,fire:Flame,terrain:Map};
@@ -39,7 +39,7 @@ export default function App(){
  const [reviewBase,setReviewBase]=useState<{id:string;label:string}|null>(null),[reviewDiff,setReviewDiff]=useState<Diff|null>(null);
  // Quick check runs in its own screen and store; '' opens its upload step, a qc- id reopens a check.
  const [quick,setQuick]=useState<string|null>(()=>location.hash.startsWith('#quick-check')?location.hash.split('/')[1]||'':null);
- const [quickFor,setQuickFor]=useState<'structure'|'fire'>('structure');
+ const [quickFor,setQuickFor]=useState<'structure'|'fire'|'plumbing'|'electrical'>('structure');
  const [variants,setVariants]=useState<any[]>([]),[layoutInfo,setLayoutInfo]=useState(''),[message,setMessage]=useState(''),[aiReply,setAIReply]=useState<any>(null),[thread,setThread]=useState<Thread|null>(null),[checkFilter,setCheckFilter]=useState('all'),[rateEdit,setRateEdit]=useState<Quantity|null>(null);
  const active=preview||project?.accepted;
  const refresh=async()=>{const p=await api<Project>('/project');setProject(p);return p};
@@ -59,7 +59,7 @@ export default function App(){
  const ask=(decision?:string)=>{const requestMessage=decision?.trim()||message.trim()||'Arrange the rooms like this drawing';setPending(requestMessage+(sketch?` [attached ${sketch.name}]`:''));return run(sketch?`Reading ${sketch.name} with ${project?.ai_vision_model||'Gemini'} — this can take up to a minute`:'Interpreting request',async()=>{const response=await api<any>('/ai',{revision_id:active!.id,message:requestMessage,selected_id:selected,thread_id:thread?.id,attachment:sketch?{name:sketch.name,mime_type:sketch.mime_type,data:sketch.data}:undefined});setAIReply(response);if(response.thread)setThread(response.thread);if(response.candidate){setPreview(response.candidate);}if(response.evidence?.candidates)setVariants(response.evidence.candidates);setMessage('');setSketch(null);await refresh()}).finally(()=>setPending(''))};
  const attach=(file?:File)=>{if(!file)return;if(!['image/png','image/jpeg','image/webp','application/pdf'].includes(file.type)){setError('Attach a PNG, JPEG, WebP or PDF drawing');return}if(file.size>8*1024*1024){setError('Drawings must be 8 MB or smaller');return}const reader=new FileReader();reader.onload=()=>{const url=String(reader.result);setSketch({name:file.name,mime_type:file.type,data:url.slice(url.indexOf(',')+1),url})};reader.readAsDataURL(file)};
  const review=(next:Discipline)=>{setDiscipline(next);setTab('review');setShowInspector(false);setMobileExplorer(false)};
- const openQuickCheck=(d?:Discipline)=>{setQuickFor(d==='fire'?'fire':'structure');setQuick('')};
+ const openQuickCheck=(d?:Discipline)=>{setQuickFor(d && ['structure','fire','plumbing','electrical'].includes(d) ? d as typeof quickFor : 'structure');setQuick('')};
  const openReviewPlan=(id?:string)=>{setTab('design');setLayers({architecture:true,furniture:false,terrain:false,structure:discipline==='structure'||discipline==='plumbing',plumbing:discipline==='plumbing',electrical:discipline==='electrical',fire:discipline==='fire',solar:discipline==='solar'});setExpanded(discipline);if(id)select(id);else setShowInspector(false)};
  const openStage=(stage:StageId)=>{
   if(['plumbing','fire','electrical','structure','solar'].includes(stage)){review(stage as Discipline);return}
@@ -75,7 +75,7 @@ export default function App(){
  };
  const loadSample=(next:SampleDiscipline)=>run('Loading sample plan',async()=>{const sample=await api<{model:Building;label:string}>(`/examples/${next}`);await importReview(sample.model,next,sample.label)});
  if(composer)return <NewProject aiProvider={project?.ai_provider??null} onExit={()=>setComposer(false)} onBuilt={async(rev)=>{setPreview(rev);setReviewBase(null);setSelected('');await refresh();setComposer(false);setHome(false);setTab('workflow');setNotice(`${rev.model.name} is ready as a candidate. Review the checks, then apply it to make it your accepted design.`)}}/>;
- if(quick!==null)return <QuickCheck initialId={quick||undefined} initialDiscipline={quickFor} connected={!!project?.ai_provider} visionModel={project?.ai_vision_model} onHome={()=>{setQuick(null);setHome(true);clearHash()}} onWorkspace={()=>{setQuick(null);clearHash();leaveHome();setTab('workflow')}} onDemoReview={next=>{setQuick(null);clearHash();leaveHome();review(next)}} onDemoSample={next=>{setQuick(null);clearHash();leaveHome();setTab('workflow');loadSample(next)}}/>;
+ if(quick!==null)return <QuickCheck initialId={quick||undefined} initialDiscipline={quickFor} connected={!!project?.ai_provider} visionModel={project?.ai_vision_model} onHome={()=>{setQuick(null);setHome(true);clearHash()}} onWorkspace={()=>{setQuick(null);clearHash();leaveHome();setTab('workflow')}}/>;
  if(home)return <Splash project={project} onNewProject={()=>setComposer(true)} onStart={()=>{leaveHome();setTab('workflow')}} onAssistant={()=>{leaveHome();setAgentOpen(true)}} onCheck={openQuickCheck} onSample={next=>{leaveHome();setTab('workflow');loadSample(next)}}/>;
  if(!active||!project)return <div className="startup"><div className="brand-mark"><Box size={30}/></div><h1>BuildGraph</h1><p>{error||'Preparing your planning workspace…'}</p>{error?<button onClick={()=>run('Loading',async()=>{await refresh()})}>Retry connection</button>:<Loader2 className="spin"/>}</div>;
  const b=active.model,r=active.results;const quantityDiff=reviewBase?reviewDiff:diff;const room=b.rooms.find(x=>x.id===selected),column=b.columns.find(x=>x.id===selected),equipment=b.equipment.find(x=>x.id===selected),fixture=b.fixtures.find(x=>x.id===selected),furniture=b.furniture.find(x=>x.id===selected),beam=r.structure.beams.find(x=>x.id===selected);

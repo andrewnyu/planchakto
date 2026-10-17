@@ -1,0 +1,158 @@
+{
+ "sheet_kind": "plumbing_plan",
+ "discipline": "plumbing",
+ "title": "Plumbing plan \u2014 Sample office annex",
+ "units": "mm",
+ "storeys": 1,
+ "footprint": {
+  "width": 20000,
+  "depth": 12000,
+  "box": [
+   191.7,
+   83.3,
+   771.7,
+   727.8
+  ]
+ },
+ "rooms": [
+  {
+   "name": "OFFICE A",
+   "box": [
+    201.3,
+    89.8,
+    430.4,
+    274.7
+   ]
+  },
+  {
+   "name": "OFFICE B",
+   "box": [
+    201.3,
+    278.6,
+    430.4,
+    468.1
+   ]
+  },
+  {
+   "name": "CONFERENCE",
+   "box": [
+    201.3,
+    471.9,
+    430.4,
+    721.3
+   ]
+  },
+  {
+   "name": "CORRIDOR",
+   "box": [
+    436.2,
+    89.8,
+    527.1,
+    721.3
+   ]
+  },
+  {
+   "name": "LOBBY",
+   "box": [
+    532.9,
+    89.8,
+    762.0,
+    274.7
+   ]
+  },
+  {
+   "name": "PANTRY",
+   "box": [
+    532.9,
+    278.6,
+    762.0,
+    403.6
+   ]
+  },
+  {
+   "name": "TOILET",
+   "box": [
+    532.9,
+    407.5,
+    762.0,
+    500.3
+   ]
+  },
+  {
+   "name": "STORAGE",
+   "box": [
+    532.9,
+    504.2,
+    762.0,
+    721.3
+   ]
+  }
+ ],
+ "points": [
+  {
+   "kind": "sink",
+   "name": "Pantry sink",
+   "room": "PANTRY",
+   "point": [
+    636.3,
+    341.1
+   ],
+   "watts": null,
+   "circuit": null,
+   "text": "Pantry sink"
+  },
+  {
+   "kind": "wc",
+   "name": "WC-1",
+   "room": "TOILET",
+   "point": [
+    636.3,
+    437.8
+   ],
+   "watts": null,
+   "circuit": null,
+   "text": "WC-1"
+  },
+  {
+   "kind": "basin",
+   "name": "Lavatory",
+   "room": "TOILET",
+   "point": [
+    636.3,
+    470.0
+   ],
+   "watts": null,
+   "circuit": null,
+   "text": "Lavatory"
+  },
+  {
+   "kind": "water_connection",
+   "name": "WATER SERVICE",
+   "room": null,
+   "point": [
+    288.3,
+    727.8
+   ],
+   "watts": null,
+   "circuit": null,
+   "text": "WATER SERVICE"
+  },
+  {
+   "kind": "drain_connection",
+   "name": "SANITARY OUT",
+   "room": null,
+   "point": [
+    675.0,
+    727.8
+   ],
+   "watts": null,
+   "circuit": null,
+   "text": "SANITARY OUT"
+  }
+ ],
+ "circuits": [],
+ "drain_fall_m": 0.6,
+ "drain_slope": 0.01,
+ "outside_supported": [],
+ "unread": []
+}

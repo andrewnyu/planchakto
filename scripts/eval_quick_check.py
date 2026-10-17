@@ -8,6 +8,7 @@ Cases:
   demo-FP1      the fire demo's FP-1 sheet; its printed occupancy and provisions must be read, and with no overall
                 dimension strings the footprint must be read correctly or left missing
   fire-on-S     the framing plan read as a floor plan must be flagged as not a floor plan
+  plumbing-sample / electrical-sample  the bundled service plans; truth is each recorded typed reading
 
 Needs a configured provider (Gemini in the deployed build). Run from the repo root:
     .venv/bin/python scripts/eval_quick_check.py                                   # provider from .env
@@ -63,6 +64,17 @@ def expect_fp1(i,t,n):
         if [e['side'] for e in i['exits']]!=['left']:out.append(f'exits {i["exits"]}, expected one on the left wall')
     return out
 
+def expect_service(i,truth,tol=.4):
+    out=expect_inputs(i,truth,['discipline','width','depth','drain_fall_m','drain_slope'])
+    if len(i['rooms'])!=len(truth['rooms']):out.append(f'{len(i["rooms"])} rooms, expected {len(truth["rooms"])}')
+    if len(i['items'])!=len(truth['items']):out.append(f'{len(i["items"])} items, expected {len(truth["items"])}')
+    for g,w in zip(i['items'],truth['items']):
+        if g['kind']!=w['kind'] or not near(g['x'],w['x'],tol) or not near(g['y'],w['y'],tol):out.append(f'item {g}, expected {w}')
+    for field in ('water','drain','panel'):
+        if truth[field] is not None and (i[field] is None or not all(near(a,b,tol) for a,b in zip(i[field],truth[field]))):out.append(f'{field} {i[field]}, expected {truth[field]}')
+    if i['circuits']!=truth['circuits']:out.append(f'circuits {i["circuits"]}, expected {truth["circuits"]}')
+    return out
+
 def cases(only=None):
     truth,_,_=q.map_structural(q.StructuralSheet.model_validate_json((q.SAMPLE_DIR/'structure-sample.sheet.json').read_text()))
     keys=['grid_x','grid_y','section','column_section','dead','live','soil','height','footing_width','footing_thickness']
@@ -77,9 +89,13 @@ def cases(only=None):
         yield 'fire-sample','fire',(q.SAMPLE_DIR/'fire-sample.png').read_bytes(),'image/png',lambda i,t,n:expect_fire(i,fire)+([] if t else ['outline not located on the page'])
         yield 'demo-FP1','fire',demo_sheet('FP',fire_demo()),'application/pdf',expect_fp1
         yield 'fire-on-S','fire',(q.SAMPLE_DIR/'structure-sample.png').read_bytes(),'image/png',lambda i,t,n:[] if any(x.level=='unsupported' for x in n) else ['a framing plan was not flagged as outside the fire screen']
+    for discipline in ('plumbing','electrical'):
+        if only not in (None,discipline):continue
+        sheet=q.ServiceSheet.model_validate_json((q.SAMPLE_DIR/f'{discipline}-sample.sheet.json').read_text());truth,_,_=q.map_service(sheet)
+        yield f'{discipline}-sample',discipline,(q.SAMPLE_DIR/f'{discipline}-sample.png').read_bytes(),'image/png',lambda i,t,n,truth=truth:expect_service(i,truth)+([] if t else ['outline not located on the page'])
 
 def run(readers=None,only=None):
-    readers=readers or {'structure':q.extract_structural,'fire':q.extract_fire};maps={'structure':q.map_structural,'fire':q.map_fire}
+    readers=readers or {'structure':q.extract_structural,'fire':q.extract_fire,'plumbing':lambda p:q.extract_service(p,'plumbing'),'electrical':lambda p:q.extract_service(p,'electrical')};maps={'structure':q.map_structural,'fire':q.map_fire,'plumbing':q.map_service,'electrical':q.map_service}
     report=[]
     for name,discipline,raw,mime,check in cases(only):
         t=time.monotonic()
@@ -96,7 +112,7 @@ if __name__=='__main__':
     ap.add_argument('--vertex',metavar='PROJECT',help='use Vertex AI in this GCP project')
     ap.add_argument('--model',help='override GEMINI_MODEL')
     ap.add_argument('--gcloud-user',action='store_true',help='authenticate Vertex with `gcloud auth print-access-token` instead of ADC')
-    ap.add_argument('--only',choices=['structure','fire'],help='run only this discipline\'s cases')
+    ap.add_argument('--only',choices=['structure','fire','plumbing','electrical'],help='run only this discipline\'s cases')
     args=ap.parse_args()
     from dotenv import load_dotenv
     load_dotenv(Path(__file__).resolve().parent.parent/'.env')

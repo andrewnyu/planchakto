@@ -71,7 +71,7 @@ export function Workflow({revision, onStage, onUpload, onReview, onGenerate, bus
       </section>)}
     </div>
     <div className="workflow-bottom">
-      <div className="quick-review"><span>Just need a quick check?</span>{(['plumbing', 'fire', 'electrical'] as Discipline[]).map(id => {const Icon = icons[id];return <button key={id} onClick={() => onReview(id)}><Icon size={15}/>{id === 'fire' ? 'Fire protection' : id[0].toUpperCase() + id.slice(1)}<ArrowUpRight size={12}/></button>;})}</div>
+      <div className="quick-review"><span>Review a system in this project</span>{(['plumbing', 'fire', 'electrical'] as Discipline[]).map(id => {const Icon = icons[id];return <button key={id} onClick={() => onReview(id)}><Icon size={15}/>{id === 'fire' ? 'Fire protection' : id[0].toUpperCase() + id.slice(1)}<ArrowUpRight size={12}/></button>;})}</div>
       <p>Progress describes model preparation and supported screens. Exported plans still need professional review.</p>
     </div>
   </div>;

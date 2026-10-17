@@ -15,13 +15,13 @@ The progress indicator means “prepared in this model.” It does not mean code
 
 ## Three-minute path
 
-0. Start on the landing page. Point out the two ways in: **Plan a project** (the full planning graph, which this demo follows) and **Check a plan** (a one-system check for existing drawings). Choose **Open the planning graph**.
-1. Open the **Planning** graph. Point out that every card is an entry point and that the status comes from the active revision: available inputs, calculated screens, findings, missing inputs, or an optional/not-screened state.
-2. Choose **Check a drawing**, then the **plumbing sample** link under the upload card (or **Plumbing on the demo** on the landing page). This creates a candidate on the demo project and preserves its accepted design.
-3. Show the two real route findings on the focused review screen. The plan highlights the plumbing and structure layers; each finding can locate its source element.
-4. Choose **Preview clear routes**. The routing engine recomputes water, drainage, and conduit paths. The plumbing count changes from two findings to zero.
-5. Show **Change since uploaded plan** and **Compare quantities**. In the bundled sample, the clear routes add approximately ₱600 in modeled material cost because the paths are longer. Rates are synthetic demonstration inputs.
-6. Choose **Apply revision** only if you want to show the acceptance step. Until then, the saved design remains unchanged. Undo and revision history remain available after acceptance.
+0. Start on the landing page. Point out the two ways in: **Plan a project** (the full planning graph) and **Check a plan** (a deliberately limited one-system screen for an existing drawing).
+1. Under **Check a plan**, choose **Plumbing sample**, then **Try the sample plumbing plan**. Without a provider, the recorded reading opens and says that no AI call was made.
+2. On **Confirm what was read**, show the fixture markers, water and sanitary connection points, available drain fall and minimum slope. Values remain editable before anything is calculated.
+3. Choose **Run limited plumbing check**. The water and drain paths appear on the sheet, with plan connectivity and gravity fall as the only checked items.
+4. Scroll to **Not checked**: pipe sizing, pressure and flow, vents/traps/cleanouts, structural clashes, other disciplines, quantities and cost. Emphasize that one sheet cannot establish those items, so BuildGraph does not pass them.
+5. Choose **Check another sheet** → **Electrical** → **Try the sample electrical plan**. Run it and show that one circuit remains `missing_input` because the pantry load has no printed wattage; the other circuit shows connected-load/current arithmetic.
+6. Finish on the landing page or open the full planning workspace to contrast a narrow drawing screen with a coordinated project model.
 
 ## Optional second moment: fire protection
 
@@ -54,15 +54,15 @@ Optional follow-on (about 30 seconds): **Check another sheet** → **Fire protec
 |---|---|---|
 | Structural framing plan (PDF, PNG, JPEG, WebP) | **Quick check**, in its own workspace. Gemini reads grid, columns, sections and loads with page positions, the user confirms them on the sheet, and the structure-scoped engine runs | Values not on the sheet stay missing or are labelled assumed. Other disciplines are listed as not checked. Projects and the demo are never changed |
 | Single-storey floor plan (fire) | **Quick check → Fire protection**. Gemini reads the outline, rooms, doors, exits and extinguishers; the user chooses the occupancy and hazard, and the fire-scoped engine runs with the worst travel path drawn on the sheet | Occupancy is never inferred. Provisions not shown are screened as not provided. Projects and the demo are never changed |
-| Plumbing or electrical drawing | Not read yet; the Quick check page says so and offers the samples on the demo project | Their readers are the next Quick check disciplines |
+| Plumbing plan | **Quick check → Plumbing.** Gemini reads named rooms, fixtures, water/drain points and printed fall/slope; the user confirms them before routing | Plan connectivity and gravity fall only. Sizing, hydraulics, vents/traps/cleanouts, risers and structural coordination are not checked |
+| Electrical plan | **Quick check → Electrical.** Gemini reads named rooms, loads, circuit marks, circuit values and the panel; the user confirms them before routing/load arithmetic | No conductor, breaker, voltage-drop, fault-current, grounding, riser or structural-coordination design |
 | Native BuildGraph JSON | Import from the Site inspector's **Import** dialog: schema validation, recomputation, candidate revision | The model's supplied inputs are reviewed within the implemented analytical scope |
-| Plumbing sample | Imports a bundled model with direct routes as a candidate on the demo | A reliable local demo with no AI or network dependency |
 | Fire sample | Imports a bundled office (business occupancy, no provisions) as a candidate on the demo | A reliable local demo with no AI or network dependency |
 
 ## Presentation choices
 
 - Open on the landing page, then go straight to the graph. The two cards answer “what can I do here?”, and the graph answers “where am I?” before the audience sees the detailed editor.
-- Use one finding-to-fix loop. The plumbing sample is the clearest because the effect is visible on the plan and in quantities.
+- Use one scope-honesty loop. The plumbing and electrical samples make the checked/not-checked boundary visible on the drawing and in the findings panel.
 - Keep advanced editing behind the graph cards and focused review actions. The audience sees the outcome before the implementation detail.
 - Say “screen,” “finding,” and “prepared.” Avoid “compliant,” “approved,” and “complete.”
 - End on the candidate bar and cost comparison. This makes the engineering principle concrete: changes are calculated and reviewed before acceptance.
@@ -73,4 +73,4 @@ Optional follow-on (about 30 seconds): **Check another sheet** → **Fire protec
 ./scripts/dev.sh
 ```
 
-Open `http://127.0.0.1:8011`. The plumbing sample, deterministic calculations, revision comparison, quantities, and exports work without an AI provider. Reading your own drawings requires a configured provider and should be demonstrated only with a non-sensitive drawing the presenter is authorized to send to that provider.
+Open `http://127.0.0.1:8011`. All four Quick check samples and their deterministic calculations work without an AI provider. Reading your own drawings requires a configured provider and should be demonstrated only with a non-sensitive drawing the presenter is authorized to send to that provider.

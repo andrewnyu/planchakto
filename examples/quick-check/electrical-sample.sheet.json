@@ -1,0 +1,175 @@
+{
+ "sheet_kind": "electrical_plan",
+ "discipline": "electrical",
+ "title": "Electrical plan \u2014 Sample office annex",
+ "units": "mm",
+ "storeys": 1,
+ "footprint": {
+  "width": 20000,
+  "depth": 12000,
+  "box": [
+   191.7,
+   83.3,
+   771.7,
+   727.8
+  ]
+ },
+ "rooms": [
+  {
+   "name": "OFFICE A",
+   "box": [
+    201.3,
+    89.8,
+    430.4,
+    274.7
+   ]
+  },
+  {
+   "name": "OFFICE B",
+   "box": [
+    201.3,
+    278.6,
+    430.4,
+    468.1
+   ]
+  },
+  {
+   "name": "CONFERENCE",
+   "box": [
+    201.3,
+    471.9,
+    430.4,
+    721.3
+   ]
+  },
+  {
+   "name": "CORRIDOR",
+   "box": [
+    436.2,
+    89.8,
+    527.1,
+    721.3
+   ]
+  },
+  {
+   "name": "LOBBY",
+   "box": [
+    532.9,
+    89.8,
+    762.0,
+    274.7
+   ]
+  },
+  {
+   "name": "PANTRY",
+   "box": [
+    532.9,
+    278.6,
+    762.0,
+    403.6
+   ]
+  },
+  {
+   "name": "TOILET",
+   "box": [
+    532.9,
+    407.5,
+    762.0,
+    500.3
+   ]
+  },
+  {
+   "name": "STORAGE",
+   "box": [
+    532.9,
+    504.2,
+    762.0,
+    721.3
+   ]
+  }
+ ],
+ "points": [
+  {
+   "kind": "equipment",
+   "name": "Printer",
+   "room": "OFFICE A",
+   "point": [
+    322.2,
+    180.0
+   ],
+   "watts": 800,
+   "circuit": "C1",
+   "text": "Printer 800 W C1"
+  },
+  {
+   "kind": "equipment",
+   "name": "Workstations",
+   "room": "OFFICE B",
+   "point": [
+    322.2,
+    373.3
+   ],
+   "watts": 2400,
+   "circuit": "C1",
+   "text": "Workstations 2400 W C1"
+  },
+  {
+   "kind": "equipment",
+   "name": "Conference display",
+   "room": "CONFERENCE",
+   "point": [
+    322.2,
+    598.9
+   ],
+   "watts": 500,
+   "circuit": "C2",
+   "text": "Conference display 500 W C2"
+  },
+  {
+   "kind": "equipment",
+   "name": "Pantry load",
+   "room": "PANTRY",
+   "point": [
+    650.8,
+    341.1
+   ],
+   "watts": null,
+   "circuit": "C2",
+   "text": "Pantry load C2 (WATTS NOT SHOWN)"
+  },
+  {
+   "kind": "panel",
+   "name": "Panel LP",
+   "room": "CORRIDOR",
+   "point": [
+    481.7,
+    115.6
+   ],
+   "watts": null,
+   "circuit": null,
+   "text": "PANEL LP"
+  }
+ ],
+ "circuits": [
+  {
+   "id": "C1",
+   "name": "Lighting / general loads",
+   "voltage": 230,
+   "power_factor": 0.9,
+   "demand_factor": 0.8
+  },
+  {
+   "id": "C2",
+   "name": "Dedicated loads",
+   "voltage": 230,
+   "power_factor": 0.95,
+   "demand_factor": 1.0
+  }
+ ],
+ "drain_fall_m": null,
+ "drain_slope": null,
+ "outside_supported": [],
+ "unread": [
+  "Pantry load watts are not shown"
+ ]
+}

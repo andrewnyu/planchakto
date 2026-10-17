@@ -38,7 +38,7 @@ These are product promises. A change that breaks one is a bug, even if the tests
 |---|---|---|
 | Entry | Landing → **Plan a project** / **Open workspace** | Landing → **Check a plan**, or **Check a drawing** in the workspace |
 | Input | A `Building` model: template plus design agent, demo, or native JSON import | One uploaded drawing sheet: a structural framing plan or a single-storey floor plan (fire) |
-| AI role | Design agent edits a typed `ProjectSpec`; assistant issues typed commands | Gemini reads the sheet into a typed `StructuralSheet` or `FireSheet` |
+| AI role | Design agent edits a typed `ProjectSpec`; assistant issues typed commands | Gemini reads the sheet into a typed `StructuralSheet`, `FireSheet` or discipline-specific `ServiceSheet` |
 | Engine | `compute(b, id)`: every discipline, coordinated | `compute(b, id, scope='structure' \| 'fire')`: one discipline, the rest listed as not checked |
 | Storage | Revision store: snapshots, accept, undo | `quick_checks` records plus a page image, separate from revisions |
 | UI | `App.tsx` workspace, `Workflow`, `DisciplineReview` | `QuickCheck.tsx` + `QuickFire.tsx` (upload → confirm on the sheet → findings on the sheet) |
@@ -49,7 +49,7 @@ These are product promises. A change that breaks one is a bug, even if the tests
 backend/
   main.py        FastAPI routes; serves frontend/dist. Error mapping: ValueError→422, KeyError→404, Conflict→409
   domain.py      Building model (SI units), Parameter, commands, apply_commands, digest
-  engine.py      compute(b, revision_id, scope=None, doors=None) → result dict; SCOPES / CHECKED / NOT_CHECKED
+  engine.py      compute(b, revision_id, scope=None, doors=None) → result dict; structure / fire / plumbing / electrical scopes
   rules.py       rule catalogue, evaluate_rules(..., scope), STRUCTURAL / FIRE rule ids, in_scope
   structure.py   roof-beam FEM, footing bearing, CATALOG (RHS) and COLUMNS (SHS)
   lateral.py     NSCP 2015 §208 seismic: base shear, frame solver, drift, columns, footing sliding
@@ -58,14 +58,14 @@ backend/
   drawings.py    permit sheet set (A/S/E/P/FP) → PDF + DXF
   ai.py          provider selection, _gemini/_openrouter calls, assistant AIPlan validation
   agent.py · compose.py   new-project design agent (tool loop) and deterministic generator
-  quickcheck.py  Quick check pipeline: rasterize → StructuralSheet → map_structural → StructuralInputs → building_from_inputs → scoped compute;
-                 fire: FireSheet → map_fire → FireInputs → building_from_fire (+ drawn doors) → compute(scope='fire')
+  quickcheck.py  Quick check pipeline: rasterize → typed sheet reading → deterministic mapping → confirmable inputs → blank Building → scoped compute;
+                 structure: StructuralSheet; fire: FireSheet; plumbing/electrical: ServiceSheet with separate prompts and discipline validation
   store.py       SQLite LocalStore (revisions, compose sessions, quick_checks); cloud_store.py = Firestore + GCS
   evals/         design-agent eval cases and runner
 frontend/src/
   App.tsx        top-level state and routing (home / composer / quick check / workspace)
   Splash.tsx     landing page with the two ways in
-  QuickCheck.tsx + quickcheck.css   Quick check screen and the structural SheetView overlay
+  QuickCheck.tsx + QuickServices.tsx + quickcheck.css   Quick check shell plus structural and services overlays
   QuickFire.tsx  fire confirm panel (occupancy, hazard, provisions, rooms, doors, exits, extinguishers) and FireSheetView
   Workflow.tsx · DisciplineReview.tsx · Plan.tsx · Model3D.tsx · NewProject.tsx · AgentPanel.tsx
 examples/        demo fixtures; examples/quick-check/ = sample framing plan and floor plan PNGs + recorded readings (ground truth)
@@ -78,7 +78,7 @@ docs/            QUICK_CHECK_PLAN.md (design + as-built), HACKATHON_DEMO.md (dem
 - `compute(b, id)` with no scope is the full project analysis. Its output must not change unless you mean it to: the unscoped `result_hash` for `example()` is the regression signal.
 - `compute(b, id, scope)` runs only that discipline's analyzers. Skipped sections get stub results of the same shape, so the frontend types hold. Checks are filtered by `rules.in_scope`. The result gains `scope` and `coverage: {checked, not_checked}`.
 - `doors` passes the interior doors drawn on a Quick check floor plan to the fire screen. With it, only drawn doors and drawn exits count: no corridor door or west entrance is implied.
-- **To add a scope**, for example `plumbing` (`structure` and `fire` exist):
+- **To add a scope** (`structure`, `fire`, `plumbing` and `electrical` exist):
   1. Add its analyzers to the `SCOPES` branch in `engine.py`.
   2. Add its rule ids to an `in_scope` set in `rules.py`.
   3. Write its `CHECKED` and `NOT_CHECKED` lists.
@@ -88,13 +88,13 @@ docs/            QUICK_CHECK_PLAN.md (design + as-built), HACKATHON_DEMO.md (dem
 
 - **Flow:** upload → `rasterize` (PDF pages through pypdfium2; at most 2000 px; always PNG) → `extract_structural` (Gemini, plain JSON mode, schema in the system prompt, one repair retry) → `map_structural` (deterministic; produces `StructuralInputs`, a page transform and notes) → the user confirms → `run` → `building_from_inputs` (a blank `Building` with no rooms, services or rates) → `compute(scope='structure')`.
 - **Fire flow:** `extract_fire` → `FireSheet` (footprint with overall dimensions and outline box, rooms as boxes, interior doors by the two room names plus a point, exterior exits by page side, extinguishers, printed occupancy and provisions) → `map_fire` (scales rooms from their boxes, snaps edges within 0.35 m so neighbours share walls, places doors on the shared wall) → `FireInputs` → `building_from_fire` (blank `Building` with rooms and `FireProtection(enabled=True)`, plus drawn door segments) → `compute(scope='fire', doors=…)`. Room overlap, rooms covering under 90% of the floor, doors on no shared wall and extinguishers outside every room are refused with a 422.
+- **Services flow:** plumbing and electrical each use a `ServiceSheet` tied to the requested discipline. Plumbing confirms rooms, fixture points, water/drain connections, available fall and minimum slope; it screens plan connectivity and gravity fall only. Electrical confirms load points, panel, circuit, voltage, power factor and demand factor; it screens plan connectivity and load arithmetic only. Missing values remain missing or block the run. Both explicitly list sizing, protection, risers and structural coordination as not checked.
 - **Fire inputs that are never assumed:** occupancy (read only when printed, never inferred from room names) and contents hazard; the run is refused until both are set. Provisions not shown on the sheet (sprinklers, alarm, emergency lighting, exit signs) are screened as not provided and labelled *assumed*. Exit widths not printed are scaled from the drawing (*assumed*); unrated extinguishers are screened as 2-A (*assumed*); a 1-A unit is not counted.
 - **Fire page sides:** the model's y runs down the page, so `FireExit.side` is top/bottom/left/right as drawn, mapped to the engine's walls in `quickcheck.WALL` (top = south, y = 0).
 - **Coordinates:** Gemini returns page positions on a 0–1000 scale (`point` is [y, x], `box` is [ymin, xmin, ymax, xmax]). The transform is per-axis `page = s·metres + o`, fitted from the grid lines. The overlay draws in the image's pixel space.
 - **Notes levels:** `read`, `assumed`, `missing`, `conflict`, `unsupported`. Height, loads and soil have no defaults. Section, footing size and seismic zone default with an *assumed* label.
-- **Samples:** each sample sheet (`structure-sample`, `fire-sample`) is read live when a provider is connected and asked for; otherwise the recorded reading is used, and the UI says "No AI call was made". The floor plan sample deliberately prints no occupancy. Regenerate all four files with `scripts/make_quick_check_sample.py`.
+- **Samples:** all four discipline samples (`structure`, `fire`, `plumbing`, `electrical`) are read live when a provider is connected and asked for; otherwise their recorded readings are used, and the UI says "No AI call was made". Fire deliberately prints no occupancy; electrical deliberately omits one wattage so `missing_input` is visible. Regenerate the PNG/JSON pairs with `scripts/make_quick_check_sample.py`.
 - **Next (phase 6):**
-  - floor-plan readers for plumbing and electrical (each a new sheet schema plus scope);
   - multi-sheet checks that share a grid, which turn coordination checks on;
   - promote to project (blocked: a blank model has no rooms or survey);
   - a retention TTL.
@@ -168,5 +168,6 @@ npm test --prefix frontend
   - Cloud Run deploy, with gzip and year-long caching of hashed assets;
   - **Quick check for structural framing plans** (live eval 3/3 on gemini-3.8-flash);
   - **Quick check for fire on single-storey floor plans** (live eval 3/3 on gemini-3.8-flash).
+- In the current working tree: **limited Quick checks for plumbing and electrical plans** (recorded demo samples, typed service readings, deterministic mapping and explicit one-sheet coverage limits). Unit/integration tests pass; live Gemini eval has not yet been run for these two readers.
 - Deployed: Cloud Run revision `buildgraph-00013` serves `dcd0aec` (structural Quick check). Fire Quick check is on `main` but not yet deployed.
-- Next: the rest of Quick check phase 6 (see above), then deck and video updates for the Quick check moment ([docs/HACKATHON_DEMO.md](docs/HACKATHON_DEMO.md) has the script).
+- Next: multi-sheet coordination and project promotion/retention, then deck and video updates for the Quick check moment ([docs/HACKATHON_DEMO.md](docs/HACKATHON_DEMO.md) has the script).

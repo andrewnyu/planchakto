@@ -3,8 +3,8 @@ import {AlertTriangle, ArrowLeft, ArrowRight, Box, CheckCircle2, Columns3, Dropl
 import type {Building, Check, Result} from './types';
 import {api, num} from './api';
 import {Field, Status} from './ui';
-import type {Discipline} from './planning';
 import {FIRE_RULES, FIRE_TARGET, FIRE_TARGET_LABEL, FireConfirmPanel, FireSheetView, fireLabel, type FireExtraction, type FireInputs} from './QuickFire';
+import {SERVICE_RULES, ServiceConfirmPanel, ServiceSheetView, serviceLabel, type ServiceInputs, type ServiceRecord} from './QuickServices';
 import './quickcheck.css';
 
 type Level = 'read' | 'assumed' | 'missing' | 'conflict' | 'unsupported';
@@ -26,29 +26,32 @@ type RecordBase = {
 };
 export type StructureRecord = RecordBase & {discipline: 'structure'; extraction: {title: string; sections: Callout[]; loads: Load[]}; inputs: QuickInputs};
 export type FireRecord = RecordBase & {discipline: 'fire'; extraction: FireExtraction; inputs: FireInputs};
-export type QuickCheckRecord = StructureRecord | FireRecord;
-type Checkable = 'structure' | 'fire';
+export type QuickCheckRecord = StructureRecord | FireRecord | ServiceRecord;
+type Checkable = 'structure' | 'fire' | 'plumbing' | 'electrical';
 
 const BEAMS = [['RHS150', 'RHS 150 × 100 × 5'], ['RHS200', 'RHS 200 × 100 × 6'], ['RHS250', 'RHS 250 × 150 × 8']];
 const COLUMNS = [['SHS150', 'SHS 150 × 150 × 6'], ['SHS200', 'SHS 200 × 200 × 8'], ['SHS250', 'SHS 250 × 250 × 9']];
 const RULES: Record<string, string> = {SLS: 'Beam deflection', ELASTIC: 'Beam stress', BEARING: 'Footing bearing', 'SEISMIC-V': 'Seismic base shear', DRIFT: 'Storey drift', COLUMN: 'Column capacity', 'FRAME-MEMBER': 'Frame member flexure', 'FOOT-LATERAL': 'Footing under seismic load', WIND: 'Wind', 'PH-CODE': 'Outside this screen'};
 const LABELS: Record<string, string> = {grid_x: 'Grid spacing', grid_y: 'Grid spacing', columns: 'Columns', height: 'Storey height', section: 'Roof beam section', column_section: 'Column section', dead: 'Dead load', live: 'Live load', soil: 'Soil bearing', footing_width: 'Footing size', footing_thickness: 'Footing size', zone: 'Seismic zone', r_factor: 'R', na: 'Na', nv: 'Nv', friction: 'Base friction'};
 export const ORDER = ['fail', 'missing_input', 'unsupported', 'pass', 'not_applicable'];
-const READY: {id: Checkable; label: string; icon: typeof Flame}[] = [{id: 'structure', label: 'Structure', icon: Columns3}, {id: 'fire', label: 'Fire protection', icon: Flame}];
-const OTHER: {id: Discipline; label: string; icon: typeof Flame}[] = [{id: 'plumbing', label: 'Plumbing', icon: Droplets}, {id: 'electrical', label: 'Electrical', icon: Zap}];
+const READY: {id: Checkable; label: string; icon: typeof Flame}[] = [{id: 'structure', label: 'Structure', icon: Columns3}, {id: 'fire', label: 'Fire protection', icon: Flame}, {id: 'plumbing', label: 'Plumbing', icon: Droplets}, {id: 'electrical', label: 'Electrical', icon: Zap}];
 const COPY: Record<Checkable, {eyebrow: string; body: string; file: string; page: string; sample: string; check: string}> = {
   structure: {eyebrow: 'QUICK CHECK · STRUCTURE', body: 'Upload a roof framing plan. Gemini reads the grid, columns, member sizes and loads off the sheet. You confirm what it read, then the structural screen runs on exactly that, and every finding is pinned to the drawing.',
     file: 'Choose a framing plan', page: 'PDF page with the framing plan', sample: 'Try the sample framing plan', check: 'structural'},
   fire: {eyebrow: 'QUICK CHECK · FIRE PROTECTION', body: 'Upload a single-storey floor plan. Gemini reads the outline, rooms, doors, exits and extinguishers off the sheet. You choose the occupancy and confirm the plan, then the RA 9514 egress screen runs on exactly that, with the worst travel path drawn on the sheet.',
     file: 'Choose a floor plan', page: 'PDF page with the floor plan', sample: 'Try the sample floor plan', check: 'fire and egress'},
+  plumbing: {eyebrow: 'QUICK CHECK · PLUMBING', body: 'Upload one plumbing plan. Gemini reads named rooms, fixtures and the water and drain connection points. You confirm the points and drain fall, then BuildGraph screens plan connectivity and gravity fall—not pipe sizing or hydraulic design.',
+    file: 'Choose a plumbing plan', page: 'PDF page with the plumbing plan', sample: 'Try the sample plumbing plan', check: 'limited plumbing'},
+  electrical: {eyebrow: 'QUICK CHECK · ELECTRICAL', body: 'Upload one electrical plan. Gemini reads named rooms, load points, circuit marks and the panel. You confirm the ratings, then BuildGraph screens plan connectivity and load arithmetic—not conductor sizing, protection or voltage drop.',
+    file: 'Choose an electrical plan', page: 'PDF page with the electrical plan', sample: 'Try the sample electrical plan', check: 'limited electrical'},
 };
 
-export function QuickCheck({initialId, initialDiscipline = 'structure', connected, visionModel, onHome, onWorkspace, onDemoReview, onDemoSample}: {
+export function QuickCheck({initialId, initialDiscipline = 'structure', connected, visionModel, onHome, onWorkspace}: {
   initialId?: string; initialDiscipline?: Checkable; connected: boolean; visionModel?: string | null;
-  onHome: () => void; onWorkspace: () => void; onDemoReview: (discipline: Discipline) => void; onDemoSample: (discipline: 'fire' | 'plumbing') => void;
+  onHome: () => void; onWorkspace: () => void;
 }) {
   const [record, setRecord] = useState<QuickCheckRecord | null>(null);
-  const [inputs, setInputs] = useState<QuickInputs | FireInputs | null>(null);
+  const [inputs, setInputs] = useState<QuickInputs | FireInputs | ServiceInputs | null>(null);
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(''), [error, setError] = useState('');
   const [selected, setSelected] = useState<string[]>([]);
@@ -79,11 +82,12 @@ export function QuickCheck({initialId, initialDiscipline = 'structure', connecte
         <li key={id} className={step === id ? 'active' : ['upload', 'confirm', 'results'].indexOf(step) > i ? 'done' : ''}><i>{i + 1}</i>{label}</li>)}
     </ol>
     {error && <p className="inline-error quick-error" role="alert">{error}</p>}
-    {step === 'upload' ? <UploadStep initial={initialDiscipline} connected={connected} visionModel={visionModel} busy={busy} onRead={(label, fn) => act(label, async () => open(await fn()))} onDemoReview={onDemoReview} onDemoSample={onDemoSample}/> :
+    {step === 'upload' ? <UploadStep initial={initialDiscipline} connected={connected} visionModel={visionModel} busy={busy} onRead={(label, fn) => act(label, async () => open(await fn()))}/> :
       <div className="quick-layout">
         <section className="quick-sheet" aria-label="Uploaded drawing">
           {record!.discipline === 'fire' ? <FireSheetView record={record!} inputs={shown as FireInputs} results={step === 'results' ? record!.results : null} selected={selected} onSelect={id => setSelected([id])}/> :
-            <SheetView record={record!} inputs={shown as QuickInputs} results={step === 'results' ? record!.results : null} selected={selected}
+            record!.discipline === 'plumbing' || record!.discipline === 'electrical' ? <ServiceSheetView record={record as ServiceRecord} inputs={shown as ServiceInputs} results={step === 'results' ? record!.results : null} selected={selected} onSelect={id => setSelected([id])}/> :
+            <SheetView record={record as StructureRecord} inputs={shown as QuickInputs} results={step === 'results' ? record!.results : null} selected={selected}
               onSelect={id => setSelected([id])}
               onToggleColumn={step === 'confirm' ? (i, j) => {const s = inputs as QuickInputs; setInputs(edit(s, 'columns', s.columns.some(c => c[0] === i && c[1] === j) ? s.columns.filter(c => !(c[0] === i && c[1] === j)) : [...s.columns, [i, j]]))} : undefined}/>}
         </section>
@@ -91,7 +95,8 @@ export function QuickCheck({initialId, initialDiscipline = 'structure', connecte
           {record!.mode === 'recorded' && <p className="quick-recorded"><FileCheck2 size={14}/> Recorded reading of the sample sheet. No AI call was made{connected ? '' : '; connect Gemini to read your own drawings'}.</p>}
           {step === 'confirm' ? (record!.discipline === 'fire' ?
             <FireConfirmPanel record={record!} inputs={inputs as FireInputs} setInputs={setInputs} busy={busy} onRun={run} selected={selected} onSelect={id => setSelected([id])} onCancel={record!.status === 'checked' ? () => {setEditing(false); setInputs(record!.inputs)} : undefined}/> :
-            <ConfirmPanel record={record!} inputs={inputs as QuickInputs} setInputs={setInputs} busy={busy} onRun={run} onCancel={record!.status === 'checked' ? () => {setEditing(false); setInputs(record!.inputs)} : undefined}/>) :
+            record!.discipline === 'plumbing' || record!.discipline === 'electrical' ? <ServiceConfirmPanel record={record as ServiceRecord} inputs={inputs as ServiceInputs} setInputs={setInputs} busy={busy} onRun={run} onCancel={record!.status === 'checked' ? () => {setEditing(false); setInputs(record!.inputs)} : undefined}/> :
+            <ConfirmPanel record={record as StructureRecord} inputs={inputs as QuickInputs} setInputs={setInputs} busy={busy} onRun={run} onCancel={record!.status === 'checked' ? () => {setEditing(false); setInputs(record!.inputs)} : undefined}/>) :
             <ResultsPanel record={record!} selected={selected} onSelect={setSelected} onEdit={() => setEditing(true)} onNew={() => open(null)}/>}
         </aside>
       </div>}
@@ -103,9 +108,9 @@ function edit<K extends keyof QuickInputs>(inputs: QuickInputs, field: K, value:
   return {...inputs, [field]: value, assumed: inputs.assumed.filter(f => !key.includes(f)), entered: Array.from(new Set([...inputs.entered, ...key]))};
 }
 
-function UploadStep({initial, connected, visionModel, busy, onRead, onDemoReview, onDemoSample}: {
+function UploadStep({initial, connected, visionModel, busy, onRead}: {
   initial: Checkable; connected: boolean; visionModel?: string | null; busy: string;
-  onRead: (label: string, fn: () => Promise<QuickCheckRecord>) => void; onDemoReview: (discipline: Discipline) => void; onDemoSample: (discipline: 'fire' | 'plumbing') => void;
+  onRead: (label: string, fn: () => Promise<QuickCheckRecord>) => void;
 }) {
   const [file, setFile] = useState<File | null>(null), [page, setPage] = useState(1), [error, setError] = useState('');
   const [discipline, setDiscipline] = useState<Checkable>(initial), copy = COPY[discipline];
@@ -137,7 +142,6 @@ function UploadStep({initial, connected, visionModel, busy, onRead, onDemoReview
     <div className="quick-upload-card">
       <div className="quick-disciplines" role="radiogroup" aria-label="System to check">
         {READY.map(d => <button key={d.id} role="radio" aria-checked={discipline === d.id} className={discipline === d.id ? 'active' : ''} disabled={!!busy} onClick={() => setDiscipline(d.id)}><d.icon size={15}/> {d.label}</button>)}
-        {OTHER.map(d => <button key={d.id} role="radio" aria-checked="false" disabled title="Coming next"><d.icon size={15}/> {d.label}</button>)}
       </div>
       <label className="file-drop"><Upload size={25}/><strong>{file?.name || copy.file}</strong><span>PDF, PNG, JPEG or WebP · one sheet · up to 8 MB</span>
         <input aria-label="Drawing file" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp" disabled={!!busy} onChange={e => {setFile(e.target.files?.[0] || null); setError(''); setPage(1)}}/></label>
@@ -146,7 +150,7 @@ function UploadStep({initial, connected, visionModel, busy, onRead, onDemoReview
       {!connected && <p className="helper">No AI provider is connected on this server, so your own drawings cannot be read. The sample sheet works with a recorded reading.</p>}
       <button className="button primary full" disabled={!!busy || !file || !connected} onClick={read}>{busy ? <><Loader2 size={14} className="spin"/> {busy}</> : <><ScanSearch size={15}/> Read drawing with {reader}</>}</button>
       <button className="button secondary full" disabled={!!busy} onClick={sample}><Play size={14}/> {copy.sample}</button>
-      <p className="helper">Plumbing and electrical sheets need their own readers and are coming next. Until then, try them on the demo project, as a candidate that leaves its saved design unchanged: the <button className="text-button inline" onClick={() => onDemoSample('plumbing')}>plumbing sample</button> or the <button className="text-button inline" onClick={() => onDemoReview('electrical')}>electrical review</button>.</p>
+      {(discipline === 'plumbing' || discipline === 'electrical') && <p className="helper">This demo screens only what one plan can establish. Results name the omitted design and coordination checks instead of passing them.</p>}
     </div>
   </div>;
 }
@@ -323,12 +327,15 @@ function ResultsPanel({record, selected, onSelect, onEdit, onNew}: {record: Quic
     return [...map.entries()].sort(([a], [b]) => ORDER.indexOf(a.split('|')[0]) - ORDER.indexOf(b.split('|')[0]));
   }, [r]);
   const fire = record.discipline === 'fire';
-  const target = (c: Check) => {if (fire) return fireTarget(c, r); const id = locatable(c, r); if (!id) return undefined; const f = r.structure.foundations.find(f => f.column_id === id); return f ? f.id : id};
+  const service = record.discipline === 'plumbing' || record.discipline === 'electrical';
+  const target = (c: Check) => {if (fire) return fireTarget(c, r); if (service) return c.objects.find(id => id.startsWith('water-') || id.startsWith('drain-') || id.startsWith('conduit-')); const id = locatable(c, r); if (!id) return undefined; const f = r.structure.foundations.find(f => f.column_id === id); return f ? f.id : id};
   const assumed = Array.from(new Set(record.inputs.assumed.map(f => fire ? fireLabel(f) : LABELS[f] || f)));
+  const rules = fire ? FIRE_RULES : service ? SERVICE_RULES : RULES;
+  const title = fire ? 'Fire and egress findings' : service ? `${record.discipline === 'plumbing' ? 'Plumbing' : 'Electrical'} plan findings` : 'Structural findings';
   // A selection made on the drawing brings its finding into view in the panel.
   useEffect(() => {document.querySelector('.finding-targets .target.on')?.scrollIntoView({block: 'nearest', behavior: 'smooth'})}, [selected.join()]);
   return <div className="results-panel">
-    <div className="results-head"><h2>{fire ? 'Fire and egress findings' : 'Structural findings'}</h2><span className="mono quiet">{record.id}</span></div>
+    <div className="results-head"><h2>{title}</h2><span className="mono quiet">{record.id}</span></div>
     <div className="result-counts">
       <span className={'count fail' + (r.summary.fail ? '' : ' zero')}><strong>{r.summary.fail}</strong> fail</span><span className="count missing_input"><strong>{r.summary.missing_input}</strong> missing input</span>
       <span className="count pass"><strong>{r.summary.pass}</strong> pass</span><span className="count unsupported"><strong>{r.summary.unsupported}</strong> not evaluated</span>
@@ -336,7 +343,7 @@ function ResultsPanel({record, selected, onSelect, onEdit, onNew}: {record: Quic
     {assumed.length > 0 && <p className="quick-assumed"><Pencil size={13}/> Uses assumed values for {assumed.join(', ').toLowerCase()}. <button className="text-button inline" onClick={onEdit}>Confirm them</button></p>}
     {groups.map(([key, checks]) => {const [status, rule] = key.split('|'); const first = checks[0];
       return <article key={key} className={'finding-group ' + status}>
-        <div className="review-finding-top"><Status status={status}/><strong>{(fire ? FIRE_RULES : RULES)[rule] || rule}</strong>{checks.length > 1 && <span className="quiet">× {checks.length}</span>}<span className="mono quiet">{rule}</span></div>
+        <div className="review-finding-top"><Status status={status}/><strong>{rules[rule] || rule}</strong>{checks.length > 1 && <span className="quiet">× {checks.length}</span>}<span className="mono quiet">{rule}</span></div>
         <p>{first.evidence}</p>
         <div className="finding-targets">
           {checks.map(c => {const id = target(c); return id ? <button key={c.id} className={'target' + (selected.includes(id) ? ' on' : '')} onClick={() => onSelect([id])}><MapPin size={11}/>{label(id, record)}</button> : null})}
@@ -351,14 +358,15 @@ function ResultsPanel({record, selected, onSelect, onEdit, onNew}: {record: Quic
     <div className="run-bar">
       <button className="button secondary full" onClick={() => {onEdit(); document.querySelector('.quick-page')?.scrollTo({top: 0})}}><Pencil size={14}/> Edit inputs and re-run</button>
       <button className="button secondary full" onClick={onNew}><RefreshCw size={14}/> Check another sheet</button>
-      <p className="helper tight">{fire ? 'Preliminary screening only. Fire safety plans need the BFP\'s evaluation (FSEC) and review by the responsible licensed professional before permit submission.' : 'Preliminary screening only. A licensed civil or structural engineer must review the design before construction or permit submission.'}</p>
+      <p className="helper tight">{fire ? 'Preliminary screening only. Fire safety plans need the BFP\'s evaluation (FSEC) and review by the responsible licensed professional before permit submission.' : service ? `Preliminary one-sheet screening only. A licensed ${record.discipline === 'plumbing' ? 'Sanitary Engineer or Master Plumber' : 'Professional Electrical Engineer'} must complete and review the design.` : 'Preliminary screening only. A licensed civil or structural engineer must review the design before construction or permit submission.'}</p>
     </div>
   </div>;
 }
 
 function label(id: string, record: QuickCheckRecord) {
   if (record.discipline === 'fire') return FIRE_TARGET_LABEL[id] || id;
-  const i = record.inputs, m = record.model!, r = record.results!;
+  if (record.discipline === 'plumbing' || record.discipline === 'electrical') return serviceLabel(id, record);
+  const structural = record as StructureRecord, i = structural.inputs, m = structural.model!, r = structural.results!;
   const gl = (x: number, axis: 'x' | 'y') => {const g = axis === 'x' ? i.grid_x : i.grid_y, l = axis === 'x' ? i.grid_x_labels : i.grid_y_labels; const k = g.findIndex(v => Math.abs(v - x) < 1e-6); return k >= 0 ? l[k] : `${x} m`};
   const beam = r.structure.beams.find(b => b.id === id);
   if (beam) return `${gl(beam.x1, 'x')}–${gl(beam.x2, 'x')} / ${gl(beam.y, 'y')}`;

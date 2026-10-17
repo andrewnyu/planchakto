@@ -38,7 +38,7 @@ def test_scoped_compute_reports_only_structure_and_lists_the_rest():
     assert not rules&{'LAYOUT','FITOUT','ROUTE','DRAIN','ELECTRICAL'}
     assert r['scope']=='structure' and {x['item'] for x in r['coverage']['not_checked']}>={'Plumbing and electrical routes','Fire protection'}
     assert not any('Plumbing hydraulic' in c['evidence'] for c in r['checks'])
-    with pytest.raises(ValueError):compute(b,'qc',scope='plumbing')
+    with pytest.raises(ValueError):compute(b,'qc',scope='unknown')
 
 def test_the_recorded_sample_maps_to_the_drawn_frame():
     i,t,notes=q.map_structural(TRUTH)

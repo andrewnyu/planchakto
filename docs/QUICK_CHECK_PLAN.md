@@ -1,6 +1,6 @@
 # Quick check workspace — implementation plan
 
-Status: **phases 1–5 built 2026-10-17** (structure); **phase 6 fire built 2026-10-17**. Plumbing, electrical, multi-sheet checks and project promotion are open.
+Status: **phases 1–5 built 2026-10-17** (structure); **phase 6 fire, plumbing and electrical built 2026-10-17**. Plumbing and electrical are intentionally limited one-sheet screens. Multi-sheet checks and project promotion remain open.
 
 ### As built (differences from the plan below)
 - `backend/quickcheck.py` holds the whole pipeline: rasterize, `StructuralSheet` reading, `map_structural`, `building_from_inputs`, `create`/`create_sample`/`run`. Endpoints: `POST /api/quick-checks`, `POST /api/quick-checks/sample`, `GET /api/quick-checks/{id}`, `GET …/{id}/image`, `POST …/{id}/run` (body: the full `StructuralInputs`).
@@ -10,7 +10,7 @@ Status: **phases 1–5 built 2026-10-17** (structure); **phase 6 fire built 2026
 - `StructuralInputs.assumed` / `.entered` record where each value came from. `Parameter.source` carries that into the results ("Read from the uploaded drawing", "Entered in quick check", "Assumed — not on the drawing; confirm").
 - The model view is the Quick check's own SVG (grid, beams, footings), not `<Plan readOnly>`, because the blank model has no rooms, survey or routes.
 - **Promote to project is deferred**: a blank framing model has no rooms or survey, so the project pipeline's terrain and layout checks cannot run on it.
-- `ReviewUpload.tsx` and the "map this drawing onto the current model" path are removed. Every "check a drawing" entry point opens Quick check. The fire and plumbing samples still load as labelled candidates on the demo project.
+- `ReviewUpload.tsx` and the "map this drawing onto the current model" path are removed. Every "check a drawing" entry point opens Quick check. The older fire candidate sample remains available separately on the demo project.
 - Sample sheet and ground truth come from `scripts/make_quick_check_sample.py`; the live eval is `scripts/eval_quick_check.py`.
 
 ### As built — phase 6, fire (2026-10-17)
@@ -21,6 +21,13 @@ Status: **phases 1–5 built 2026-10-17** (structure); **phase 6 fire built 2026
 - **Rules:** `rules.FIRE` lists the FIRE-* ids and `in_scope` admits them under the fire scope. Structural `PH-CODE` gaps are not emitted under fire; `FIRE-SCOPE` lists the fire items not evaluated.
 - **UI:** `QuickFire.tsx`. The discipline picker enables Fire protection (also from the landing card and from the fire review's **Check a drawing**). The confirm panel puts occupancy and hazard first as required choices, then provisions, outline, editable rooms, doors (add by picking two rooms), exits and extinguishers. The overlay draws rooms, doors, exits and extinguishers on the sheet; results add the worst travel path to an exit, the farthest point from an extinguisher, and rooms with no way out in red.
 - **Sample and eval:** `examples/quick-check/fire-sample.png` is a 20 × 12 m office with a full-width corridor, eight rooms, seven doors, three exits and one 2-A extinguisher, and no printed occupancy. With business / low hazard it fails `FIRE-EXT` (one extinguisher for 240 m², 20.4 m away at worst) and `FIRE-ALARM` (not shown). Live eval cases: `fire-sample` (geometry within 0.35 m, doors by room pair, exits, extinguisher, occupancy left unread), `demo-FP1` (the fire demo's FP-1 sheet: printed occupancy and provisions read; no overall dimension strings, so the footprint is read right or left missing) and `fire-on-S` (the framing plan read as a floor plan must be flagged). gemini-3.8-flash passed 3/3 at about 10 s per sheet.
+
+### As built — phase 6, plumbing and electrical (2026-10-17)
+- **Typed reading:** `ServiceSheet` is tied to the requested discipline. It reads the footprint, named room boxes and page-positioned service points. Plumbing points are fixtures plus water and sanitary connections; electrical points are equipment/load points plus the panel. Printed drain fall/slope and circuit values are copied only when shown.
+- **Deterministic mapping:** `map_service` scales rooms and points from the footprint transform, resolves every item to a named/containing room, and leaves conflicts out. `ServiceInputs` is confirmed before `building_from_service` creates a blank one-discipline model.
+- **Plumbing scope:** fixture-to-water and fixture-to-drain plan routes plus gravity fall using user-confirmed available fall and minimum slope. Pipe sizes, pressure/flow, hydraulic adequacy, vents, traps, cleanouts, risers, quantities and structural clashes are listed as not checked.
+- **Electrical scope:** equipment-to-panel plan routes plus connected load and single-phase current arithmetic from confirmed watts, voltage, power factor and demand factor. Missing watts remain `missing_input`. Conductors, breakers, voltage drop, fault current, grounding, code coverage, risers, quantities and structural clashes are listed as not checked.
+- **Samples:** `plumbing-sample` and `electrical-sample` are synthetic 20 × 12 m plans with recorded readings. The electrical sample deliberately omits one load rating to demonstrate that missing input does not pass.
 
 ### Answers to the open questions
 - **Bounding-box accuracy:** on the sample and on the demo's CAD-style S-1 sheet, gemini-3.8-flash placed grid lines within about 1/1000 of the page (fit residual < 0.5 units) and read every value exactly. Dense real-world sheets are still unproven. The overlay degrades to the model view when no transform can be fitted.
@@ -67,7 +74,7 @@ The demo project is never touched.
 
 **`backend/engine.py`**
 - `compute(b, revision_id, scope: set[str] | None = None)`. `None` keeps today's behaviour exactly, so all existing tests and the demo stay unchanged.
-- `SCOPES = {'structure': {'structure','lateral'}, 'fire': {'fire'}, 'plumbing': {'routing:water','routing:drain'}, 'electrical': {'routing:conduit'}, 'solar': {'solar','structure'}}`.
+- `SCOPES = {'structure': {'structure','lateral'}, 'fire': {'fire'}, 'plumbing': {'routing:water','routing:drain'}, 'electrical': {'routing:conduit','electrical:load'}}`. Solar remains a full-project screen, not a single-drawing Quick check.
 - Skip analyzers outside the scope and return `{'skipped': True, 'reason': 'Outside this check'}` for them. Quantities run only on in-scope items.
 - Add `result['coverage'] = {'checked': [...], 'not_checked': [{'item', 'reason'}]}`.
 
@@ -151,7 +158,7 @@ New `frontend/src/QuickCheck.tsx`, rendered as its own top-level view (not a pro
 
 Same pipeline, a new schema per discipline:
 - **Fire (built):** floor plan → rooms, interior doors, exit doors (wall and offset), extinguishers, occupancy (asked, not inferred). See *As built — phase 6* above.
-- **Plumbing / electrical:** fixtures/equipment and utility points. Clashes with structure are reported as "not checked" unless a framing sheet is added.
+- **Plumbing / electrical (built, intentionally limited):** fixtures/equipment and utility points. Clashes with structure are reported as "not checked" unless a future framing sheet is added.
 - **Multi-sheet check:** let a quick check hold several sheets sharing one grid. Coordination checks then switch on, which is the natural bridge to a full project.
 
 ## Ownership and order
@@ -163,7 +170,7 @@ Same pipeline, a new schema per discipline:
 | 3 | Structural extraction + mapping + sample fixture | Codex |
 | 4 | QuickCheck screen, DrawingOverlay, Splash rewiring | Claude |
 | 5 | Round-trip and negative evals | Codex, checked by Claude |
-| 6 | Fire (built 2026-10-17); plumbing and electrical next | Claude (fire) |
+| 6 | Fire, plumbing and electrical built 2026-10-17; multi-sheet coordination next | Claude (fire), Codex (services) |
 
 Phases 1–2 can start in parallel. Phase 4 can begin against the recorded sample fixture before Phase 3 lands.
 
