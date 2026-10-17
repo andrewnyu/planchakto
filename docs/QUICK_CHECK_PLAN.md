@@ -1,6 +1,6 @@
 # Quick check workspace — implementation plan
 
-Status: **phases 1–5 built 2026-10-17** (structure). Phase 6 (other disciplines) and project promotion are open.
+Status: **phases 1–5 built 2026-10-17** (structure); **phase 6 fire built 2026-10-17**. Plumbing, electrical, multi-sheet checks and project promotion are open.
 
 ### As built (differences from the plan below)
 - `backend/quickcheck.py` holds the whole pipeline: rasterize, `StructuralSheet` reading, `map_structural`, `building_from_inputs`, `create`/`create_sample`/`run`. Endpoints: `POST /api/quick-checks`, `POST /api/quick-checks/sample`, `GET /api/quick-checks/{id}`, `GET …/{id}/image`, `POST …/{id}/run` (body: the full `StructuralInputs`).
@@ -12,6 +12,15 @@ Status: **phases 1–5 built 2026-10-17** (structure). Phase 6 (other discipline
 - **Promote to project is deferred**: a blank framing model has no rooms or survey, so the project pipeline's terrain and layout checks cannot run on it.
 - `ReviewUpload.tsx` and the "map this drawing onto the current model" path are removed. Every "check a drawing" entry point opens Quick check. The fire and plumbing samples still load as labelled candidates on the demo project.
 - Sample sheet and ground truth come from `scripts/make_quick_check_sample.py`; the live eval is `scripts/eval_quick_check.py`.
+
+### As built — phase 6, fire (2026-10-17)
+- **Reading (`FireSheet`):** sheet kind, units, storeys; the footprint's overall width and depth from the dimension strings plus the box of its outer wall faces; rooms as named boxes; interior doors as the two printed room names plus a point; exterior exits by the page side of their wall (top/bottom/left/right), with printed clear width, mark and box; extinguishers with a point and verbatim rating; `occupancy_text` only when printed; provisions (sprinklers, manual/automatic alarm, emergency lighting, exit signs) only where a legend, symbol or note shows them. Prompt `FIRE_SYSTEM` follows `EXTRACT_SYSTEM`: untrusted image, report only what is printed, 0–1000 page coordinates, flag what does not fit.
+- **Mapping (`map_fire`, deterministic):** the transform comes from the footprint box and overall dimensions (exact per axis, so no residual). Rooms are scaled from their boxes and their edges snapped within 0.35 m, closing the wall-thickness gaps so neighbours share walls. Each door goes on the shared wall of the two named rooms nearest its point; one on no shared wall is a *conflict* and left out. Room kinds come from names (corridor, toilet, pantry…); only `corridor` matters to the engine (dead ends, corridor width).
+- **Never assumed:** occupancy (a printed classification is mapped by keyword, an unsupported one such as residential is flagged *unsupported*, and room names are never used) and contents hazard. `building_from_fire` refuses to run without them. Provisions not shown are *assumed* not provided, so they can fail but never pass on a guess. Unprinted exit widths are scaled from the drawing (*assumed*).
+- **Engine:** `compute(b, id, 'fire', doors=…)` runs `analyze_fire` only. `fire.Grid` accepts drawn door segments on walls of either orientation (matched to the 0.25 m grid within one step) and `exit_segments(b, drawn=True)` drops the planning model's implied west entrance, so a drawing without exits fails `FIRE-EXITS` instead of passing on an invented door. Unreachable floor is reported in `travel.unreachable` and fails `FIRE-TRAVEL`; the common path is measured over reachable floor (previously an unreachable cell made it infinite, which the planning model never hit). The unscoped `example()` result hash is unchanged.
+- **Rules:** `rules.FIRE` lists the FIRE-* ids and `in_scope` admits them under the fire scope. Structural `PH-CODE` gaps are not emitted under fire; `FIRE-SCOPE` lists the fire items not evaluated.
+- **UI:** `QuickFire.tsx`. The discipline picker enables Fire protection (also from the landing card and from the fire review's **Check a drawing**). The confirm panel puts occupancy and hazard first as required choices, then provisions, outline, editable rooms, doors (add by picking two rooms), exits and extinguishers. The overlay draws rooms, doors, exits and extinguishers on the sheet; results add the worst travel path to an exit, the farthest point from an extinguisher, and rooms with no way out in red.
+- **Sample and eval:** `examples/quick-check/fire-sample.png` is a 20 × 12 m office with a full-width corridor, eight rooms, seven doors, three exits and one 2-A extinguisher, and no printed occupancy. With business / low hazard it fails `FIRE-EXT` (one extinguisher for 240 m², 20.4 m away at worst) and `FIRE-ALARM` (not shown). Live eval cases: `fire-sample` (geometry within 0.35 m, doors by room pair, exits, extinguisher, occupancy left unread), `demo-FP1` (the fire demo's FP-1 sheet: printed occupancy and provisions read; no overall dimension strings, so the footprint is read right or left missing) and `fire-on-S` (the framing plan read as a floor plan must be flagged). gemini-3.8-flash passed 3/3 at about 10 s per sheet.
 
 ### Answers to the open questions
 - **Bounding-box accuracy:** on the sample and on the demo's CAD-style S-1 sheet, gemini-3.8-flash placed grid lines within about 1/1000 of the page (fit residual < 0.5 units) and read every value exactly. Dense real-world sheets are still unproven. The overlay degrades to the model view when no transform can be fitted.
@@ -141,7 +150,7 @@ New `frontend/src/QuickCheck.tsx`, rendered as its own top-level view (not a pro
 ## Phase 6 — Next disciplines
 
 Same pipeline, a new schema per discipline:
-- **Fire:** floor plan → rooms, exit doors (wall and offset), extinguishers, occupancy (asked, not inferred).
+- **Fire (built):** floor plan → rooms, interior doors, exit doors (wall and offset), extinguishers, occupancy (asked, not inferred). See *As built — phase 6* above.
 - **Plumbing / electrical:** fixtures/equipment and utility points. Clashes with structure are reported as "not checked" unless a framing sheet is added.
 - **Multi-sheet check:** let a quick check hold several sheets sharing one grid. Coordination checks then switch on, which is the natural bridge to a full project.
 
@@ -154,7 +163,7 @@ Same pipeline, a new schema per discipline:
 | 3 | Structural extraction + mapping + sample fixture | Codex |
 | 4 | QuickCheck screen, DrawingOverlay, Splash rewiring | Claude |
 | 5 | Round-trip and negative evals | Codex, checked by Claude |
-| 6 | Fire next | — |
+| 6 | Fire (built 2026-10-17); plumbing and electrical next | Claude (fire) |
 
 Phases 1–2 can start in parallel. Phase 4 can begin against the recorded sample fixture before Phase 3 lands.
 

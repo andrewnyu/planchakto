@@ -1,7 +1,7 @@
 from __future__ import annotations
 import os,io,csv,json,uuid,html,logging,time
 from pathlib import Path
-from fastapi import FastAPI,Request
+from fastapi import FastAPI,Request,Body
 from fastapi.responses import JSONResponse,Response,HTMLResponse,StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.gzip import GZipMiddleware,DEFAULT_EXCLUDED_CONTENT_TYPES
@@ -264,11 +264,11 @@ def compose_build(req:BuildRequest):
     b,notes=compose(req.spec)
     return {'revision':store().import_model(b,label=f'New project · {b.name}'[:120]),'notes':notes}
 class QuickCheckRequest(Model):
-    discipline:Literal['structure']='structure'
+    discipline:Literal['structure','fire']='structure'
     attachment:Attachment
     page:int=Field(default=0,ge=0,le=500)
 class QuickSampleRequest(Model):
-    discipline:Literal['structure']='structure'
+    discipline:Literal['structure','fire']='structure'
     live:bool=False
 def _quick_id(id:str):
     if not quickcheck.ID.match(id):raise KeyError('Quick check not found')
@@ -295,7 +295,7 @@ def get_quick_check(id:str):return quickcheck.public(store().get_quick_check(_qu
 @app.get('/api/quick-checks/{id}/image')
 def quick_check_image(id:str):return Response(store().get_quick_check_image(_quick_id(id)),media_type='image/png',headers={'Cache-Control':'private, max-age=86400'})
 @app.post('/api/quick-checks/{id}/run')
-def run_quick_check(id:str,inputs:quickcheck.StructuralInputs):return quickcheck.public(quickcheck.run(store(),_quick_id(id),inputs))
+def run_quick_check(id:str,inputs:dict=Body(...)):return quickcheck.public(quickcheck.run(store(),_quick_id(id),inputs))
 @app.post('/api/import/project')
 def import_project(req:ImportRequest):return store().import_model(req.model)
 @app.post('/api/import/survey')

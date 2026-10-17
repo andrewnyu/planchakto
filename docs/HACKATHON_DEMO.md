@@ -46,12 +46,15 @@ This is the clearest visible use of Gemini, and it takes about 40 seconds.
 
 Say "screen" and "finding"; the page itself states that a licensed engineer must review the design.
 
+Optional follow-on (about 30 seconds): **Check another sheet** → **Fire protection** → **Try the sample floor plan**. The rooms, doors and exits are drawn over the sheet. Point out that the run is blocked until you choose the occupancy, because it is not printed. Choose **Business** and **Low**, run, and show the 20.4 m path from the far corner to the only extinguisher and the alarm finding marked as assumed (not shown on the sheet). Removing the Conference door and re-running turns that room red: travel only passes doors read from the drawing.
+
 ## Upload behavior
 
 | Input | What happens | Review boundary |
 |---|---|---|
 | Structural framing plan (PDF, PNG, JPEG, WebP) | **Quick check**, in its own workspace. Gemini reads grid, columns, sections and loads with page positions, the user confirms them on the sheet, and the structure-scoped engine runs | Values not on the sheet stay missing or are labelled assumed. Other disciplines are listed as not checked. Projects and the demo are never changed |
-| Fire, plumbing or electrical drawing | Not read yet; the Quick check page says so and offers the samples on the demo project | Floor-plan readers are the next Quick check disciplines |
+| Single-storey floor plan (fire) | **Quick check → Fire protection**. Gemini reads the outline, rooms, doors, exits and extinguishers; the user chooses the occupancy and hazard, and the fire-scoped engine runs with the worst travel path drawn on the sheet | Occupancy is never inferred. Provisions not shown are screened as not provided. Projects and the demo are never changed |
+| Plumbing or electrical drawing | Not read yet; the Quick check page says so and offers the samples on the demo project | Their readers are the next Quick check disciplines |
 | Native BuildGraph JSON | Import from the Site inspector's **Import** dialog: schema validation, recomputation, candidate revision | The model's supplied inputs are reviewed within the implemented analytical scope |
 | Plumbing sample | Imports a bundled model with direct routes as a candidate on the demo | A reliable local demo with no AI or network dependency |
 | Fire sample | Imports a bundled office (business occupancy, no provisions) as a candidate on the demo | A reliable local demo with no AI or network dependency |

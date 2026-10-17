@@ -1,0 +1,225 @@
+{
+ "sheet_kind": "floor_plan",
+ "title": "A-101 Ground floor plan \u2014 Sample office annex",
+ "units": "mm",
+ "storeys": 1,
+ "footprint": {
+  "width": 20000,
+  "depth": 12000,
+  "box": [
+   191.7,
+   83.3,
+   771.7,
+   727.8
+  ]
+ },
+ "rooms": [
+  {
+   "name": "OFFICE A",
+   "box": [
+    201.3,
+    89.8,
+    430.4,
+    274.7
+   ]
+  },
+  {
+   "name": "OFFICE B",
+   "box": [
+    201.3,
+    278.6,
+    430.4,
+    468.1
+   ]
+  },
+  {
+   "name": "CONFERENCE",
+   "box": [
+    201.3,
+    471.9,
+    430.4,
+    721.3
+   ]
+  },
+  {
+   "name": "CORRIDOR",
+   "box": [
+    436.2,
+    89.8,
+    527.1,
+    721.3
+   ]
+  },
+  {
+   "name": "LOBBY",
+   "box": [
+    532.9,
+    89.8,
+    762.0,
+    274.7
+   ]
+  },
+  {
+   "name": "PANTRY",
+   "box": [
+    532.9,
+    278.6,
+    762.0,
+    403.6
+   ]
+  },
+  {
+   "name": "TOILET",
+   "box": [
+    532.9,
+    407.5,
+    762.0,
+    500.3
+   ]
+  },
+  {
+   "name": "STORAGE",
+   "box": [
+    532.9,
+    504.2,
+    762.0,
+    721.3
+   ]
+  }
+ ],
+ "doors": [
+  {
+   "between": [
+    "OFFICE A",
+    "CORRIDOR"
+   ],
+   "point": [
+    433.3,
+    180.0
+   ]
+  },
+  {
+   "between": [
+    "OFFICE B",
+    "CORRIDOR"
+   ],
+   "point": [
+    433.3,
+    373.3
+   ]
+  },
+  {
+   "between": [
+    "CONFERENCE",
+    "CORRIDOR"
+   ],
+   "point": [
+    433.3,
+    534.4
+   ]
+  },
+  {
+   "between": [
+    "LOBBY",
+    "CORRIDOR"
+   ],
+   "point": [
+    530.0,
+    228.3
+   ]
+  },
+  {
+   "between": [
+    "PANTRY",
+    "CORRIDOR"
+   ],
+   "point": [
+    530.0,
+    341.1
+   ]
+  },
+  {
+   "between": [
+    "TOILET",
+    "CORRIDOR"
+   ],
+   "point": [
+    530.0,
+    453.9
+   ]
+  },
+  {
+   "between": [
+    "STORAGE",
+    "CORRIDOR"
+   ],
+   "point": [
+    530.0,
+    566.7
+   ]
+  }
+ ],
+ "exits": [
+  {
+   "side": "bottom",
+   "room": "LOBBY",
+   "width": 1800.0,
+   "text": "E1",
+   "box": [
+    758.7,
+    148.8,
+    818.5,
+    211.2
+   ]
+  },
+  {
+   "side": "left",
+   "room": "CORRIDOR",
+   "width": 900.0,
+   "text": "E2",
+   "box": [
+    456.6,
+    52.1,
+    506.8,
+    85.6
+   ]
+  },
+  {
+   "side": "right",
+   "room": "CORRIDOR",
+   "width": 900.0,
+   "text": "E3",
+   "box": [
+    456.6,
+    725.6,
+    506.8,
+    759.0
+   ]
+  }
+ ],
+ "extinguishers": [
+  {
+   "rating": "2-A:10-B:C",
+   "point": [
+    450.2,
+    160.7
+   ]
+  }
+ ],
+ "occupancy_text": null,
+ "provisions": [
+  {
+   "kind": "exit_signs",
+   "provided": true,
+   "text": "ILLUMINATED EXIT SIGN",
+   "box": [
+    318.3,
+    786.7,
+    341.7,
+    983.3
+   ]
+  }
+ ],
+ "outside_supported": [],
+ "unread": []
+}
