@@ -3,6 +3,7 @@ import {AlertTriangle, ArrowLeft, ArrowRight, Box, Check, CheckCircle2, ChevronR
 import type {Revision} from './types';
 import {api, money, num} from './api';
 import {roomColors} from './Plan';
+import {ConceptDesigner,LegacyConceptDesigner} from './ConceptDesigner';
 import './composer.css';
 
 type TemplateId = 'house' | 'commercial' | 'warehouse';
@@ -92,6 +93,8 @@ export function NewProject({aiProvider, onExit, onBuilt}: {aiProvider: string | 
   const [templates, setTemplates] = useState<Template[]>([]);
   const [template, setTemplate] = useState<TemplateId>('commercial');
   const [brief, setBrief] = useState('');
+  const [spatialConcept, setSpatialConcept] = useState(()=>new URLSearchParams(location.search).has('planning'));
+  const [legacyConcepts,setLegacyConcepts]=useState(false);
   const [turn, setTurn] = useState<Turn | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [picked, setPicked] = useState<Record<string, unknown>>({});
@@ -168,6 +171,9 @@ export function NewProject({aiProvider, onExit, onBuilt}: {aiProvider: string | 
   };
   const newTask = () => {setTurn(null); setMessages([]); setBrief(''); setPicked({}); setOther({}); setError('');};
 
+  if (legacyConcepts) return <LegacyConceptDesigner template={template} initialBrief={brief} aiProvider={aiProvider} onExit={()=>setLegacyConcepts(false)}/>;
+  if (spatialConcept) return <ConceptDesigner template={template} initialBrief={brief} aiProvider={aiProvider} onExit={() => {setSpatialConcept(false);const url=new URL(location.href);url.searchParams.delete('planning');url.searchParams.delete('stage');history.replaceState(null,'',url);}}/>;
+
   if (!turn) return <div className="composer composer-launch-screen">
     <header className="agent-topbar"><div className="agent-brand"><span className="agent-logo"><Box size={18} strokeWidth={1.65}/></span><strong>Planchakto</strong><ChevronRight size={13}/><span>Design assistant</span></div><div className="agent-topbar-actions"><span className={'agent-connection' + (aiProvider ? ' live' : '')}><i/>{aiProvider ? 'AI connected' : 'Guided mode'}</span><button className="agent-ghost-button" onClick={onExit}><ArrowLeft size={14}/> Back to home</button></div></header>
     <main className="composer-start">
@@ -179,11 +185,13 @@ export function NewProject({aiProvider, onExit, onBuilt}: {aiProvider: string | 
             <span className="template-icon"><Icon size={17}/></span><span><strong>{t.label}</strong><small>{t.rooms.reduce((s, r) => s + r.count, 0)} rooms · ~{num(area, 0)} m²</small></span>{template === t.id && <Check className="template-check" size={14}/>}
           </button>;})}
         </div>
-        <label className="composer-brief"><span>Project prompt</span><textarea rows={6} value={brief} disabled={!aiProvider} onChange={e => setBrief(e.target.value)} placeholder={aiProvider ? examples[template] : 'Free text needs an AI provider on the server.'}/></label>
+        <label className="composer-brief"><span>Project prompt</span><textarea rows={6} value={brief} onChange={e => setBrief(e.target.value)} placeholder={examples[template]}/></label>
         <div className="launch-context"><span><Plus size={12}/> Template: {templates.find(t => t.id === template)?.label ?? 'Loading…'}</span><span><Layers size={12}/> Single storey</span></div>
         {aiProvider && !brief && <button className="agent-text-button" onClick={() => setBrief(examples[template])}><Sparkles size={13}/> Try an example prompt</button>}
         {error && <p className="inline-error" role="alert">{error}</p>}
-        <div className="launch-actions"><p>Up to 30 × 30 m. Missing inputs stay missing.</p><button className="agent-primary-button" disabled={!!busy || !templates.length} onClick={start}>{busy ? <><Loader2 className="spin" size={15}/> {busy}</> : <>Start designing <ArrowRight size={15}/></>}</button></div>
+        <div className="launch-actions"><p>Develop and accept the design first. Then screen it and prepare the review package.</p><button className="agent-primary-button" disabled={!!busy} onClick={() => setSpatialConcept(true)}>Start planning <ArrowRight size={15}/></button></div>
+        <button className="agent-text-button concept-launch-secondary" onClick={()=>setLegacyConcepts(true)}>Open earlier concept drafts</button>
+        <button className="agent-text-button concept-launch-secondary" disabled={!!busy || !templates.length} onClick={start}>{busy ? <><Loader2 className="spin" size={15}/> {busy}</> : 'Use coordinated template · up to 30 × 30 m'}</button>
       </section>
     </main>
   </div>;
@@ -193,7 +201,7 @@ export function NewProject({aiProvider, onExit, onBuilt}: {aiProvider: string | 
   const decided = shownDecisions.filter(([f]) => spec[f] != null).length;
   const edits = messages.flatMap(m => m.changes ?? []).reverse();
   return <div className="composer composer-agent">
-    <header className="agent-topbar"><div className="agent-brand"><span className="agent-logo"><Box size={18} strokeWidth={1.65}/></span><strong>Planchakto</strong><ChevronRight size={13}/><span>{spec.name ?? 'Untitled project'}</span></div><div className="agent-topbar-actions"><span className="agent-branch"><GitBranch size={12}/> candidate / new-project</span><span className={'agent-connection' + (aiProvider ? ' live' : '')}><i/>{aiProvider ? 'AI connected' : 'Guided mode'}</span><button className="agent-ghost-button" onClick={onExit}><ArrowLeft size={14}/> Exit</button></div></header>
+    <header className="agent-topbar"><div className="agent-brand"><span className="agent-logo"><Box size={18} strokeWidth={1.65}/></span><strong>Planchakto</strong><ChevronRight size={13}/><span>{spec.name ?? 'Untitled project'}</span></div><div className="agent-topbar-actions"><span className="agent-branch"><GitBranch size={12}/> candidate / new-project</span><span className={'agent-connection' + (aiProvider ? ' live' : '')}><i/>{aiProvider ? 'AI connected' : 'Guided mode'}</span><button className="agent-ghost-button" disabled={!!busy} onClick={() => setSpatialConcept(true)}>Open staged planning</button><button className="agent-ghost-button" onClick={onExit}><ArrowLeft size={14}/> Exit</button></div></header>
     <div className="composer-grid">
       <section className="composer-chat" aria-label="Project conversation">
         <header className="chat-panel-head"><div><span className="chat-agent-icon"><Sparkles size={14}/></span><span><strong>Design assistant</strong><small>{aiProvider ? 'Agent · can edit project brief' : 'Guided questionnaire'}</small></span></div><span className="chat-session">{messages.filter(m => m.role === 'user').length + 1} turns</span></header>

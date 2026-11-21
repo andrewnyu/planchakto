@@ -33,7 +33,7 @@ export default function App(){
  const setAgentOpen=(open:boolean)=>{setAgentOpenState(open);try{localStorage.setItem('bg.agentOpen',open?'1':'0')}catch{}};
  const [pending,setPending]=useState('');
  const [sketch,setSketch]=useState<{name:string;mime_type:string;data:string;url:string}|null>(null);
- const [home,setHome]=useState(true),[composer,setComposer]=useState(false);
+ const [home,setHome]=useState(true),[composer,setComposer]=useState(()=>new URLSearchParams(location.search).has('planning'));
  const leaveHome=()=>setHome(false);
  const [discipline,setDiscipline]=useState<Discipline>('plumbing');
  const [reviewBase,setReviewBase]=useState<{id:string;label:string}|null>(null),[reviewDiff,setReviewDiff]=useState<Diff|null>(null);

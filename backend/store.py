@@ -21,6 +21,7 @@ class LocalStore:
             # Quick checks live apart from the project revision history: no accept, undo or branching.
             db.execute('CREATE TABLE IF NOT EXISTS quick_checks(id TEXT PRIMARY KEY, updated_at REAL NOT NULL, data TEXT NOT NULL)')
             db.execute('CREATE TABLE IF NOT EXISTS quick_check_images(id TEXT PRIMARY KEY, data BLOB NOT NULL)')
+            db.execute('CREATE TABLE IF NOT EXISTS design_artifacts(id TEXT PRIMARY KEY, data TEXT NOT NULL)')
     @contextmanager
     def db(self):
         db=sqlite3.connect(self.path,timeout=30);db.row_factory=sqlite3.Row
@@ -28,6 +29,22 @@ class LocalStore:
             db.execute('BEGIN IMMEDIATE');yield db;db.commit()
         except:db.rollback();raise
         finally:db.close()
+    def save_design_artifact(self,kind,data):
+        artifact={'id':'design-'+digest({'kind':kind,'data':data}),'kind':kind,'data':data}
+        with self.db() as db:db.execute('INSERT OR IGNORE INTO design_artifacts VALUES (?,?)',(artifact['id'],json.dumps(artifact,allow_nan=False)))
+        return artifact['id']
+    def get_design_artifact(self,id):
+        with self.db() as db:r=db.execute('SELECT data FROM design_artifacts WHERE id=?',(id,)).fetchone()
+        if not r:raise KeyError('Planning artifact not found')
+        return json.loads(r['data'])
+    def save_planning_session(self,session,expected_version=None):
+        with self.db() as db:
+            row=db.execute('SELECT data FROM compose_sessions WHERE id=?',(session['id'],)).fetchone()
+            old=json.loads(row['data']) if row else None
+            if (old and old.get('version')!=expected_version) or (not old and expected_version is not None):raise Conflict('Planning workspace changed. Reload before applying this change.')
+            saved={**session,'version':(expected_version or 0)+1,'updated_at':time.time()}
+            db.execute('INSERT OR REPLACE INTO compose_sessions VALUES (?,?,?)',(saved['id'],saved['updated_at'],json.dumps(saved,allow_nan=False)))
+        return saved
     def state(self):
         with self.db() as db:r=db.execute('SELECT data FROM state WHERE id=1').fetchone()
         if not r:return self.reset()
@@ -121,6 +138,10 @@ class LocalStore:
         marks=','.join('?'*len(statuses))
         with self.db() as db:r=db.execute(f"SELECT data FROM compose_sessions WHERE json_extract(data,'$.status') IN ({marks}) ORDER BY updated_at DESC LIMIT 1",tuple(statuses)).fetchone()
         return json.loads(r['data']) if r else None
+    def list_compose_sessions(self,statuses=('planning_active',)):
+        marks=','.join('?'*len(statuses))
+        with self.db() as db:rows=db.execute(f"SELECT data FROM compose_sessions WHERE json_extract(data,'$.status') IN ({marks}) ORDER BY updated_at DESC LIMIT 24",tuple(statuses)).fetchall()
+        return [json.loads(row['data']) for row in rows]
     def save_quick_check(self,record):
         with self.db() as db:db.execute('INSERT OR REPLACE INTO quick_checks VALUES (?,?,?)',(record['id'],record['updated_at'],json.dumps(record)))
         return record

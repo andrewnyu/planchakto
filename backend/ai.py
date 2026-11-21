@@ -121,7 +121,7 @@ def validate_plan(plan:AIPlan,request:AIRequest):
 CRITERIA={'soil':('Allowable soil bearing (kPa)',(25,600),1),'dead_factor':('Dead load factor',(1,2),-1),
           'live_factor':('Live load factor',(1,2),-1),'deflection_ratio':('Deflection limit ratio (L/n)',(60,1000),-1)}
 
-def _gemini(payload,vertex=False,attachment=None,system=None,deadline=None):
+def _gemini(payload,vertex=False,attachment=None,system=None,deadline=None,thinking_level=None):
     import httpx
     from google import genai
     from google.genai import errors,types
@@ -135,7 +135,7 @@ def _gemini(payload,vertex=False,attachment=None,system=None,deadline=None):
     contents=[types.Part.from_bytes(data=attachment.raw(),mime_type=attachment.mime_type),payload] if attachment else payload
     config=types.GenerateContentConfig(temperature=0,
         # Low thinking keeps text edits at ~5 s; medium/high took 10–35 s for the same typed result on gemini-3.8-flash.
-        thinking_config=types.ThinkingConfig(thinking_level=os.getenv('GEMINI_THINKING','LOW')),response_mime_type='application/json',
+        thinking_config=types.ThinkingConfig(thinking_level=thinking_level or os.getenv('GEMINI_THINKING','LOW')),response_mime_type='application/json',
         system_instruction=system or SYSTEM+'\nReply with only one JSON object matching this JSON Schema:\n'+json.dumps(gemini_schema()))
     with client:
         for n,model in enumerate(attempts):

@@ -1,0 +1,72 @@
+.planning-agents {
+  color: #243b30;
+  margin-top: 32px;
+  border-top: 1px solid #b6c5af;
+  font-family: inherit;
+}
+
+.planning-agents > header { padding: 20px 0 4px; }
+.planning-agents > header h3 { margin: 0 0 8px; font-size: 18px; font-weight: 550; }
+.planning-agents p { font-size: 13px; line-height: 1.65; max-width: 75ch; overflow-wrap: anywhere; }
+.planning-agents > header p { margin: 0; color: #40583d; }
+.planning-agents .planning-agents-context { margin: 13px 0 17px; font-size: 12px; color: #40583d; }
+.planning-agents .planning-agents-context.is-stale { color: #75451d; }
+.planning-agents .planning-agent-roster { padding: 0; margin: 0; list-style: none; }
+.planning-agents .planning-agent-entry { padding: 16px 0; margin: 0; border-top: 1px solid #c4d1bb; }
+.planning-agent-row { display: grid; grid-template-columns: minmax(160px, 1fr) minmax(140px, .8fr) minmax(155px, .9fr); gap: 16px; align-items: center; }
+.planning-agent-identity { min-width: 0; }
+.planning-agents .planning-agent-identity h4 { margin: 0 0 4px; font-size: 14px; font-weight: 600; line-height: 1.5; }
+.planning-agents .planning-agent-identity p { margin: 0; font-size: 12px; color: #40583d; line-height: 1.5; }
+.planning-agent-state { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; font-size: 11px; color: #40583d; line-height: 1.5; }
+.planning-agent-status { color: #314b33; font-size: 12px; font-weight: 550; }
+.planning-agent-status.status-missing_input, .planning-agent-status.status-needs_inputs, .planning-agent-status.status-missing,
+.planning-agent-status.status-warning, .planning-agent-status.status-stale { color: #704815; }
+.planning-agent-status.status-fail, .planning-agent-status.status-blocked, .planning-agent-status.status-attention { color: #833a27; }
+.planning-agents .planning-agent-request { width: 100%; padding: 9px 11px; min-height: 40px; text-align: left; justify-content: flex-start; font: inherit; font-size: 12px; line-height: 1.5; border: 1px solid #869c7e; border-radius: 4px; color: #294b36; background: transparent; }
+.planning-agents button:hover:not(:disabled) { background: #d6e1cf; }
+.planning-agents button:disabled { color: #53644c; background: #e1e7d9; border-color: #a3b19a; opacity: 1; cursor: not-allowed; }
+.planning-agents button:focus-visible, .planning-agents summary:focus-visible { outline: 2px solid #28573b; outline-offset: 3px; }
+.planning-agents .planning-agent-screen-summary { margin: 10px 0 0; color: #40583d; font-size: 12px; }
+.planning-agent-review { margin-top: 11px; }
+.planning-agents .planning-agent-review > summary { display: flex; align-items: center; gap: 7px; width: fit-content; max-width: 100%; padding: 5px 0; margin: 0; font-size: 12px; color: #28543a; cursor: pointer; list-style: none; line-height: 1.5; }
+.planning-agent-review > summary::-webkit-details-marker { display: none; }
+.planning-agent-review > summary > svg { flex: 0 0 auto; }
+.planning-agent-review[open] > summary > svg { transform: rotate(180deg); }
+.planning-agent-count { font-size: 11px; color: #40583d; margin-left: 7px; }
+.planning-agent-review-content { padding: 2px 0 0 21px; }
+.planning-agents .planning-agent-review-source { margin: 8px 0 12px; color: #40583d; font-size: 11px; }
+.planning-agents .planning-agent-recommendations { padding: 0 0 0 20px; margin: 18px 0 0; }
+.planning-agents .planning-agent-recommendations > li { margin: 0; padding: 15px 0 17px 5px; border-top: 1px solid #c4d1bb; }
+.planning-agents .planning-agent-recommendations > li::marker { color: #40583d; font-size: 12px; }
+.planning-agents h5 { margin: 0 0 7px; font: inherit; font-size: 13px; font-weight: 600; line-height: 1.5; }
+.planning-agents .planning-agent-recommendations p { margin: 7px 0; }
+.planning-agent-evidence { margin-top: 12px; color: #40583d; font-size: 12px; }
+.planning-agent-evidence > strong { font-weight: 550; }
+.planning-agents .planning-agent-finding-links { display: flex; flex-wrap: wrap; gap: 3px 14px; list-style: none; margin: 3px 0; padding: 0; }
+.planning-agents .planning-agent-finding-links li { margin: 0; }
+.planning-agents .planning-agent-finding-links button { display: inline-flex; align-items: center; gap: 4px; min-height: 32px; border: 0; border-radius: 2px; padding: 4px 0; font: inherit; font-size: 12px; text-decoration: underline; text-underline-offset: 3px; color: #28543a; background: transparent; overflow-wrap: anywhere; text-align: left; }
+.planning-agents .planning-agent-finding-links button:disabled { color: #53644c; background: transparent; text-decoration: none; }
+.planning-agents .planning-agent-input-evidence { font-size: 12px; }
+.planning-agent-input-evidence code { font: inherit; font-weight: 500; overflow-wrap: anywhere; }
+.planning-agent-questions { margin-top: 22px; }
+.planning-agent-questions > ul { padding-left: 20px; }
+.planning-agent-questions > ul > li { padding: 12px 0; border-top: 1px solid #c4d1bb; }
+.planning-agent-questions > ul > li > p { margin: 0; }
+.planning-agents .planning-agents-limit { margin: 8px 0 0; padding-top: 16px; border-top: 1px solid #b6c5af; font-size: 12px; color: #40583d; }
+.planning-agents ::selection { color: #203a2a; background: #e7b080; }
+
+@media (max-width: 1050px) {
+  .planning-agent-row { grid-template-columns: minmax(150px, 1fr) minmax(140px, .8fr); gap: 10px 16px; }
+  .planning-agents .planning-agent-request { grid-column: 1 / -1; width: fit-content; }
+}
+
+@media (max-width: 520px) {
+  .planning-agent-row { grid-template-columns: 1fr; gap: 10px; }
+  .planning-agent-state { gap: 3px; }
+  .planning-agents .planning-agent-request { width: 100%; min-height: 44px; }
+  .planning-agents .planning-agent-review > summary { flex-wrap: wrap; min-height: 36px; }
+  .planning-agent-count { flex-basis: 100%; margin-left: 21px; }
+  .planning-agent-review-content { padding-left: 0; }
+  .planning-agents .planning-agent-finding-links { display: block; }
+  .planning-agents .planning-agent-finding-links button { min-height: 44px; }
+}

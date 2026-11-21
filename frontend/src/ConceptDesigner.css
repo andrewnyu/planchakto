@@ -1,0 +1,94 @@
+.concept-designer { min-height: 0; }
+.concept-workspace { display: grid; grid-template-columns: minmax(290px, 340px) minmax(320px, 1fr) minmax(250px, 290px); flex: 1; min-height: 0; }
+.concept-conversation { display: flex; flex-direction: column; min-width: 0; min-height: 0; border-right: 1px solid var(--agent-line); background: var(--agent-panel); }
+.concept-conversation > header { padding: 25px 22px 20px; border-bottom: 1px solid var(--agent-line); }
+.concept-conversation h1 { margin: 0 0 9px; font-size: 24px; line-height: 1.2; letter-spacing: -.025em; font-weight: 500; }
+.concept-conversation header p, .concept-introduction p { font-size: 13px; line-height: 1.6; color: #bbc8bf; margin: 0 0 12px; }
+.concept-messages { flex: 1; min-height: 90px; overflow-y: auto; padding: 22px; scrollbar-color: #53675a var(--agent-panel); }
+.concept-introduction > button { margin-top: 10px; }
+.concept-message { padding: 0 0 22px; margin-bottom: 22px; border-bottom: 1px solid var(--agent-line); overflow-wrap: anywhere; }
+.concept-message > strong { font-size: 12px; font-weight: 500; color: #e7b387; }
+.concept-message.user > strong { color: #b8cebf; }
+.concept-message p { font-size: 13px; line-height: 1.65; white-space: pre-wrap; margin: 8px 0 0; }
+.concept-question { color: #e7b387; }
+.concept-progress { display: flex; align-items: flex-start; gap: 9px; font-size: 13px; line-height: 1.5; color: #d8e4db; }
+.concept-progress svg { flex-shrink: 0; margin-top: 2px; }
+.concept-input { padding: 16px; border-top: 1px solid var(--agent-line); }
+.concept-input label { display: block; font-size: 12px; margin-bottom: 8px; color: #d2ded5; }
+.concept-input textarea { width: 100%; resize: vertical; max-height: 260px; min-height: 110px; padding: 12px; background: #202c25; border: 1px solid #53675a; border-radius: 5px; color: #edf2ed; font-size: 13px; line-height: 1.5; caret-color: #edbb95; }
+.concept-input textarea::placeholder { color: #b0beb5; }
+.concept-input > div { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+.concept-designer .agent-primary-button { color: #1b211b; background: #e5a16d; border-color: #e5a16d; box-shadow: none; font-size: 12px; font-weight: 500; }
+.concept-designer .agent-primary-button:hover:not(:disabled) { background: #f1b98e; border-color: #f1b98e; }
+.concept-designer .agent-ghost-button { height: auto; min-height: 32px; font-size: 12px; color: #cad7ce; }
+.concept-designer button:disabled { opacity: .5; cursor: default; }
+.concept-designer button:focus-visible, .concept-designer textarea:focus-visible, .concept-designer summary:focus-visible { outline: 2px solid #e8a978; outline-offset: 3px; }
+.concept-stage button:focus-visible, .concept-stage summary:focus-visible, .concept-inspector button:focus-visible, .concept-inspector summary:focus-visible { outline-color: #34523b; }
+.concept-designer ::selection { background: #d6ad7b; color: #14251b; }
+.concept-error { margin: 0; padding: 12px 18px; background: #422b25; color: #ffe3d5; font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
+.concept-stage { display: flex; flex-direction: column; min-height: 0; min-width: 0; background: #e8ece3; color: #263b32; }
+.concept-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 17px 20px; background: #f5f7f1; border-bottom: 1px solid #c8d1c4; }
+.concept-toolbar > div { display: flex; align-items: center; gap: 7px; }
+.concept-toolbar > div:first-child { flex-direction: column; align-items: flex-start; min-width: 0; }
+.concept-toolbar strong { font-size: 14px; line-height: 1.4; font-weight: 500; overflow-wrap: anywhere; }
+.concept-toolbar span { font-size: 12px; color: #526355; }
+.concept-stage .agent-ghost-button { color: #334b3a; border-color: #9aa895; }
+.concept-stage .agent-ghost-button:hover:not(:disabled) { background: #d5dfcf; color: #203c2a; }
+.concept-options { display: flex; overflow-x: auto; gap: 0; padding: 0 12px; flex-shrink: 0; background: #f5f7f1; scrollbar-color: #8f9f86 #f5f7f1; border-bottom: 1px solid #c8d1c4; }
+.concept-options > button { padding: 14px 12px; min-width: 180px; max-width: 300px; display: flex; flex-direction: column; align-items: flex-start; gap: 5px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; text-align: left; color: #4a5e4f; }
+.concept-options > button.selected { border-bottom-color: #435e43; background: #e4eadf; color: #1e3826; }
+.concept-options span { display: flex; align-items: flex-start; gap: 5px; font-size: 12px; line-height: 1.45; font-weight: 500; }
+.concept-options small { font-size: 11px; }
+.concept-view-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 20px; }
+.concept-view-tools > div { display: flex; gap: 5px; }
+.concept-view-tools button { padding: 6px 10px; border: 1px solid #a4b09e; border-radius: 4px; color: #435746; font-size: 12px; }
+.concept-view-tools button[aria-pressed="true"] { background: #304d38; color: #f1f5ec; border-color: #304d38; }
+.concept-view-tools > span { font-size: 11px; color: #50624e; }
+.concept-canvas { flex: 1; min-height: 180px; display: flex; align-items: center; justify-content: center; padding: 12px; overflow: hidden; }
+.concept-plan { width: 100%; height: 100%; max-height: 100%; }
+.concept-lot { fill: #f4f5eb; stroke: #6b7e62; stroke-width: 1.5px; vector-effect: non-scaling-stroke; }
+.concept-road { stroke: #9b6139; stroke-width: 5px; vector-effect: non-scaling-stroke; }
+.concept-zone { fill: #c7d7c3; stroke: #65775e; stroke-width: 1px; vector-effect: non-scaling-stroke; cursor: pointer; }
+.concept-zone.zone-storage, .concept-zone.zone-loading { fill: #ddcbb2; }
+.concept-zone.zone-service, .concept-zone.zone-office, .concept-zone.zone-bathroom, .concept-zone.zone-kitchen { fill: #c4d5d6; }
+.concept-zone.zone-circulation { fill: #e7d6b7; }
+.concept-zone.zone-bedroom { fill: #d0c9db; }
+.concept-zone.zone-parking { fill: #d1d6ca; }
+.concept-zone.zone-outdoor, .concept-zone.zone-landscape, .concept-zone.zone-future { fill: #d5e3c6; }
+.concept-zone.outdoor { stroke-dasharray: 3 2; }
+.concept-zone.selected { stroke: #b16027; stroke-width: 3px; }
+.concept-plan text { fill: #213b2a; pointer-events: none; paint-order: stroke; stroke: #f5f6ee; stroke-width: .4px; font-family: 'Geist Mono', monospace; }
+.concept-shell { fill: none; stroke: #354f37; stroke-width: 2px; vector-effect: non-scaling-stroke; pointer-events: none; }
+.concept-opening { stroke: #fcfcf4; stroke-width: 4px; vector-effect: non-scaling-stroke; pointer-events: none; }
+.concept-empty { max-width: 340px; padding: 30px 16px; text-align: center; }
+.concept-empty > svg { color: #6b805f; }
+.concept-empty h2 { font-size: 24px; line-height: 1.25; font-weight: 500; margin: 18px 0 12px; }
+.concept-empty p { font-size: 14px; line-height: 1.6; color: #51654e; margin: 0; }
+.concept-actions { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; padding: 13px 20px; border-top: 1px solid #c3cebc; background: #f5f7f1; }
+.concept-actions > span { font-size: 12px; color: #52644f; }
+.concept-actions > div { display: flex; flex-wrap: wrap; gap: 8px; }
+.concept-inspector { min-height: 0; overflow-y: auto; padding: 24px 20px; background: #f6f7f1; color: #293f2f; border-left: 1px solid #c8d1c4; scrollbar-color: #8e9f85 #f6f7f1; }
+.concept-inspector h2 { font-size: 18px; line-height: 1.3; font-weight: 500; margin: 0 0 15px; }
+.concept-inspector h3 { font-size: 13px; font-weight: 500; margin: 26px 0 10px; }
+.concept-inspector p, .concept-inspector li { font-size: 12px; line-height: 1.65; overflow-wrap: anywhere; }
+.concept-inspector ul { padding-left: 17px; margin: 0 0 16px; }
+.concept-inspector li { margin-bottom: 9px; }
+.concept-inspector .concept-zone-list { list-style: none; padding: 0; }
+.concept-zone-list li { margin: 0; border-bottom: 1px solid #d6decf; }
+.concept-zone-list button { width: 100%; display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; color: #344f38; font-size: 12px; text-align: left; }
+.concept-zone-list button.selected { color: #95501c; }
+.concept-zone-list b { white-space: nowrap; font-family: 'Geist Mono', monospace; font-weight: 400; font-size: 11px; }
+.concept-inspector .agent-text-button { color: #7a451c; font-size: 12px; }
+.concept-inspector .agent-ghost-button { color: #334b3a; border-color: #9aa895; }
+.concept-inspector .concept-review-note { margin: 28px 0 18px; padding-top: 18px; border-top: 1px solid #c8d1c4; color: #586951; }
+.concept-area { display: block; font: 22px 'Geist Mono', monospace; margin-bottom: 12px; }
+.concept-source { color: #53674e; }
+.concept-site-review { max-height: 45%; overflow-y: auto; padding: 20px; border-top: 1px solid #c8d1c4; background: #f4f5ec; }
+.concept-site-review h2 { font-size: 17px; font-weight: 500; margin: 0 0 10px; }
+.concept-site-review p, .concept-site-review summary { font-size: 12px; line-height: 1.5; margin: 8px 0; }
+.concept-site-review pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 11px; }
+.concept-site-review > div { display: flex; gap: 10px; margin-top: 15px; }
+.concept-launch-secondary { margin: 0 18px 16px; }
+@media (max-width: 1120px) { .concept-workspace { grid-template-columns: minmax(260px, 300px) minmax(0, 1fr); } .concept-inspector { grid-column: 1 / -1; max-height: 250px; border-top: 1px solid #c8d1c4; border-left: 0; } .concept-workspace { grid-template-rows: minmax(0, 1fr) auto; } }
+@media (max-width: 720px) { .concept-designer { height: auto; min-height: 100dvh; overflow: visible; } .concept-workspace { display: flex; flex-direction: column; } .concept-conversation { min-height: 390px; } .concept-messages { max-height: 300px; } .concept-stage { min-height: 550px; } .concept-canvas { min-height: 340px; flex: none; } .concept-inspector { max-height: none; } .concept-toolbar { padding: 15px; } .concept-options > button { min-width: 160px; } .concept-view-tools { padding: 12px 15px; } .concept-input textarea { font-size: 16px; } .concept-designer button { min-height: 40px; } .concept-site-review { max-height: none; } .concept-plan { height: 350px; } }
+@media (prefers-reduced-motion: reduce) { .concept-designer .spin { animation: none; } }

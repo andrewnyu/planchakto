@@ -80,6 +80,26 @@ class GoogleStore(LocalStore):
         session={**session,'updated_at':time.time()}
         self.root.collection('compose_sessions').document(session['id']).set(session)
         return session
+    def save_design_artifact(self,kind,data):
+        id='design-'+digest({'kind':kind,'data':data});blob=self.bucket.blob(f'{self.workspace}/planning/{id}.json')
+        from google.api_core.exceptions import PreconditionFailed
+        try:blob.upload_from_string(json.dumps({'id':id,'kind':kind,'data':data},allow_nan=False),content_type='application/json',if_generation_match=0)
+        except PreconditionFailed:pass  # content-addressed immutable retry
+        return id
+    def get_design_artifact(self,id):
+        import re
+        if not re.fullmatch(r'design-[a-f0-9]{64}',id):raise KeyError('Invalid planning artifact')
+        blob=self.bucket.blob(f'{self.workspace}/planning/{id}.json')
+        if not blob.exists():raise KeyError('Planning artifact not found')
+        return json.loads(blob.download_as_text())
+    def save_planning_session(self,session,expected_version=None):
+        ref=self.root.collection('compose_sessions').document(session['id'])
+        @firestore.transactional
+        def save(tx):
+            doc=ref.get(transaction=tx);old=doc.to_dict() if doc.exists else None
+            if (old and old.get('version')!=expected_version) or (not old and expected_version is not None):raise Conflict('Planning workspace changed. Reload before applying this change.')
+            saved={**session,'version':(expected_version or 0)+1,'updated_at':time.time()};tx.set(ref,saved);return saved
+        return save(self.fs.transaction())
     def get_compose_session(self,id):
         if not id.startswith('compose-') or '/' in id:raise KeyError('Invalid design session')
         doc=self.root.collection('compose_sessions').document(id).get()
@@ -89,6 +109,9 @@ class GoogleStore(LocalStore):
         # Ordered on one field and filtered here: an equality filter plus order_by would need a composite index.
         docs=self.root.collection('compose_sessions').order_by('updated_at',direction=firestore.Query.DESCENDING).limit(50).stream()
         return next((d.to_dict() for d in docs if d.to_dict().get('status') in statuses),None)
+    def list_compose_sessions(self,statuses=('planning_active',)):
+        docs=self.root.collection('compose_sessions').order_by('updated_at',direction=firestore.Query.DESCENDING).limit(100).stream()
+        return [d.to_dict() for d in docs if d.to_dict().get('status') in statuses][:24]
     # Quick checks: one JSON record and one page image per check in GCS, apart from the revision index.
     def save_quick_check(self,record):
         self.bucket.blob(f'{self.workspace}/quick-checks/{record["id"]}.json').upload_from_string(json.dumps(record),content_type='application/json');return record

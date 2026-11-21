@@ -37,11 +37,11 @@ These are product promises. A change that breaks one is a bug, even if the tests
 | | Full planning | Quick check |
 |---|---|---|
 | Entry | Landing → **Plan a project** / **Open workspace** | Landing → **Check a plan**, or **Check a drawing** in the workspace |
-| Input | A `Building` model: template plus design agent, demo, or native JSON import | One uploaded drawing sheet: a structural framing plan or a single-storey floor plan (fire) |
-| AI role | Design agent edits a typed `ProjectSpec`; assistant issues typed commands | Gemini reads the sheet into a typed `StructuralSheet`, `FireSheet` or discipline-specific `ServiceSheet` |
-| Engine | `compute(b, id)`: every discipline, coordinated | `compute(b, id, scope='structure' \| 'fire')`: one discipline, the rest listed as not checked |
-| Storage | Revision store: snapshots, accept, undo | `quick_checks` records plus a page image, separate from revisions |
-| UI | `App.tsx` workspace, `Workflow`, `DisciplineReview` | `QuickCheck.tsx` + `QuickFire.tsx` (upload → confirm on the sheet → findings on the sheet) |
+| Input | Staged programme/site/polygon layouts and detailed objects; coordinated `Building` templates/demo/native import remain available | One uploaded drawing sheet: a structural framing plan or a single-storey floor plan (fire) |
+| AI role | Architectural agent proposes typed spatial programmes and fit-out recipes; seven specialists give grounded advice. The coordinated assistant still issues typed commands | Gemini reads the sheet into a typed `StructuralSheet`, `FireSheet` or discipline-specific `ServiceSheet` |
+| Engine | `planning_checks` screens the accepted polygon snapshot with supplied inputs; coordinated templates use `compute(b, id)` | `compute(b, id, scope='structure' \| 'fire')`: one discipline, the rest listed as not checked |
+| Storage | Immutable planning artifacts + versioned stage references and checkpoints; coordinated revisions retain snapshots/accept/undo | `quick_checks` records plus a page image, separate from revisions |
+| UI | `PlanningWorkspace.tsx` + `PlanningAgents.tsx`; coordinated `App.tsx` workspace, `Workflow`, `DisciplineReview` remain separate | `QuickCheck.tsx` + `QuickFire.tsx` (upload → confirm on the sheet → findings on the sheet) |
 
 ## Architecture map
 
@@ -58,16 +58,22 @@ backend/
   drawings.py    permit sheet set (A/S/E/P/FP) → PDF + DXF
   ai.py          provider selection, _gemini/_openrouter calls, assistant AIPlan validation + repair retry + relaxation guards;
                  sketch edits: typed SketchReading (page corners) → rectify/snap → move_room/swap_rooms
-  agent.py · compose.py   new-project design agent (tool loop) and deterministic generator
+  agent.py · compose.py   coordinated-template design agent and deterministic generator (regular Building family)
+  concepts.py · concept_program.py   polygon site/layout reading, typed footprint/cuts/merges/access intentions and deterministic compilation
+  planning_models.py · planning_workflow.py   staged contracts, CAS gates, immutable candidates/checkpoints and exact design acceptance
+  planning_details.py · planning_routes.py · planning_checks.py   placed objects, explicit geometric routes, bounded deterministic screens
+  planning_agents.py · planning_outputs.py · planning_api.py   seven grounded specialists, review PDF/DXF/CSV/JSON/ZIP and staged HTTP API
   quickcheck.py  Quick check pipeline: rasterize → typed sheet reading → deterministic mapping → confirmable inputs → blank Building → scoped compute;
                  structure: StructuralSheet; fire: FireSheet; plumbing/electrical: ServiceSheet with separate prompts and discipline validation
   store.py       SQLite LocalStore (revisions, compose sessions, quick_checks); cloud_store.py = Firestore + GCS
   evals/         design-agent eval cases and runner
 frontend/src/
   App.tsx        top-level state and routing (home / composer / quick check / workspace)
+  ConceptDesigner.tsx + ConceptDesigner.css   spatial alternatives, site confirmation, concept apply/discard/undo/redo and export
   Splash.tsx     landing page with the two ways in
   QuickCheck.tsx + QuickServices.tsx + quickcheck.css   Quick check shell plus structural and services overlays
   QuickFire.tsx  fire confirm panel (occupancy, hazard, provisions, rooms, doors, exits, extinguishers) and FireSheetView
+  PlanningWorkspace.tsx · planningForms.tsx · PlanningAgents.tsx   primary staged planning UI; ConceptDesigner retains earlier concept drafts
   Workflow.tsx · DisciplineReview.tsx · Plan.tsx · Model3D.tsx · NewProject.tsx · AgentPanel.tsx
 examples/        demo fixtures; examples/quick-check/ = sample framing plan and floor plan PNGs + recorded readings (ground truth)
 scripts/         dev.sh, deploy.sh, eval_assistant.py, eval_quick_check.py, make_quick_check_sample.py, fixtures.py, benchmark.py
@@ -75,6 +81,9 @@ docs/            QUICK_CHECK_PLAN.md (design + as-built), HACKATHON_DEMO.md (dem
 ```
 
 ## Engine contract
+
+- **Spatial concepts are a separate planning stage.** `backend/concepts.py` accepts one-floor polygon layouts up to 500 m across, including large retail sites and non-rectangular zones. Gemini chooses geometry and connections; deterministic code validates polygons, site containment, overlaps, allocation and entrance connectivity. These results are `geometry_checked`, with engineering, fire, traffic, services and cost explicitly **not checked**. They never enter `compute` or the project revision store. The coordinated engine's 30 × 30 m family remains unchanged.
+- Concept sessions use `status='concept_active'` in the existing session store, isolated from coordinated compose and assistant sessions. Every proposal keeps its own site snapshot and content hash. Applying, undoing or redoing a concept changes only its concept timeline. Site readings must be confirmed before use; native PDF recovery requires independently agreeing printed scale and area. See [docs/SPATIAL_CONCEPTS.md](docs/SPATIAL_CONCEPTS.md).
 
 - `compute(b, id)` with no scope is the full project analysis. Its output must not change unless you mean it to: the unscoped `result_hash` for `example()` is the regression signal.
 - `compute(b, id, scope)` runs only that discipline's analyzers. Skipped sections get stub results of the same shape, so the frontend types hold. Checks are filtered by `rules.in_scope`. The result gains `scope` and `coverage: {checked, not_checked}`.
@@ -158,6 +167,18 @@ npm test --prefix frontend
 | Owner | Scope | Files | State |
 |---|---|---|---|
 | — | No active work | — | — |
+
+## Planning update (2026-11-21)
+
+- Primary new-project flow is now **Start planning**: programme → site/access → spatial layout → detailed layout → explicit user design acceptance → engineering inputs → deterministic screens → review package. Each editable stage makes a candidate. Upstream confirmation invalidates downstream acceptance/analysis. The old coordinated template and earlier concept drafts stay separately available.
+- Planning uses one-floor polygon designs up to 500 m, not bounding-box conversion into the old 30 × 30 m Building. Spatial operations include model-selected cuts/merges, explicitly requested area fitting, actual shared-wall/public-access derivation and proposed parking allowances. Detailed recipes compile real fixtures/furniture/racks/cashiers/bays and measured route envelopes. Counts come from placed objects.
+- Planning artifacts are content-addressed and immutable: SQLite `design_artifacts` locally, GCS in cloud; Firestore holds small session refs. Mutations use CAS versions. Late AI replies/stale tabs cannot overwrite current stages. Undo/redo restores checkpoints and requires screens to rerun. Native imports revalidate every stage and never restore prior acceptance as current.
+- Seven specialist roles—architecture, structure, fire/accessibility, electrical, plumbing, site/traffic and quantities—share the current accepted design/input/result hashes. Their typed advice cites actual findings or exact supplied input paths, cannot invent numbers or calculations, and never applies edits. Deterministic status is shown independently from whether a live AI review exists. Failed/stale reviews are not presented as current advice.
+- Bounded screens cover programme/placement, route envelopes and grid exit reachability, supplied-criterion arithmetic, explicit isolated roof-bay FEM and independently supplied-load bearing, circuit arithmetic, direct drainage-fall arithmetic, geometric takeoff and sourced rates. Unknowns remain null/missing/unpriced. Full-building structure, statutory fire/accessibility, swept paths and complete MEP/civil design remain explicitly unsupported. Exports are preliminary review sets, not certifications or permit readiness.
+- Calls retain plain JSON + Pydantic validation. Staged spatial design may use up to three validated proposal attempts, with no new full provider call after 80 s elapsed, within the existing request budget. Other generators and specialists use one validation repair. `scripts/eval_planning.py` and `scripts/eval_specialists.py` record real live calls in isolated private databases; automated acceptance is labelled `automated_evaluation`, never user acceptance.
+- Full staged paths have been exercised on a three-bedroom house and a large irregular-site store. Raw current-model designs and Gemini app responses are labelled separately; seven live Gemini specialist reviews validated. Gemini's store fit-out generation remains unreliable and rejected proposals are recorded honestly. The demo unscoped hash and frozen pre-reference raw comparison remain unchanged.
+- Validation: 361 backend tests, 9 frontend tests and the TypeScript/Vite build pass. Browser checks cover desktop/mobile/actual viewport, acknowledgement gating, finding focus, PDF download and blank/cleared engineering measurements. The fresh finish reviewer scored its missing-measurement and empty-filter fixes resolved (`ship` at that fix scope); the documenter verified the incumbent visual system was preserved.
+- Everything above is included in this change; deployment is unchanged. Private lot/architect drawings, raw designs, live trials and comparison exports stay in `.data/`, not public fixtures. The architect's meeting-copy plan has now been studied; the original frozen raw baseline predates that review, while later raw alternatives are explicitly reference-informed. See [docs/PLANNING_WORKFLOW.md](docs/PLANNING_WORKFLOW.md).
 
 ## Status (2026-10-17)
 

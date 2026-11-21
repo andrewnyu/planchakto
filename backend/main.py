@@ -16,7 +16,7 @@ from .structure import CATALOG
 from .geometry import parse_survey,validate_site
 from .layout import generate_layouts
 from .ai import AIRequest,Attachment,interpret,status
-from . import quickcheck
+from . import quickcheck,concepts
 from .example import example
 from .compose import ProjectSpec,TEMPLATES,Template,template_spec,apply_answer,questions_for,compose,preview
 from .ai import compose_turn
@@ -252,7 +252,9 @@ def reject_compose_session(id:str):
     return _session_view(store().save_compose_session(session))
 @app.post('/api/compose/sessions/{id}/build')
 def build_compose_session(id:str):
-    session=store().get_compose_session(id);spec=ProjectSpec.model_validate(session['spec']);b,notes=compose(spec)
+    session=store().get_compose_session(id)
+    if session.get('status')=='concept_active':raise ValueError('Spatial concepts cannot be built as engineering revisions. Their engineering scope is not checked.')
+    spec=ProjectSpec.model_validate(session['spec']);b,notes=compose(spec)
     revision=store().import_model(b,label=f'New project · {b.name}'[:120]);session['status']='built';session['candidate_revision_id']=revision['id']
     summary=revision['results']['summary']
     session['messages'].append({'role':'assistant','text':f"Built {b.name} as a candidate revision: {b.width:g} × {b.depth:g} m, {summary['pass']} checks pass, {summary['fail']} fail and {summary['missing_input']} wait for inputs. "
@@ -263,6 +265,112 @@ def build_compose_session(id:str):
 def compose_build(req:BuildRequest):
     b,notes=compose(req.spec)
     return {'revision':store().import_model(b,label=f'New project · {b.name}'[:120]),'notes':notes}
+
+# Free spatial concepts use their own session status and never enter the engineering revision store.
+class ConceptCreate(Model):
+    template:Template='commercial'
+class ConceptTurn(Model):
+    message:str=Field(min_length=1,max_length=12000)
+    base_candidate_id:str|None=None
+class ConceptSiteRequest(Model):
+    site:concepts.SitePlan|None
+class ConceptReadRequest(Model):
+    attachment:Attachment
+    page:int=Field(default=0,ge=0,le=500)
+class ConceptChoice(Model):
+    candidate_id:str
+    expected_accepted_id:str|None
+
+def _concept_session(id):
+    session=store().get_compose_session(id)
+    if session.get('status')!='concept_active':raise KeyError('Concept session not found')
+    return session
+
+def _save_concept(session):
+    # Firestore documents have a 1 MiB ceiling; keep margin for adapter metadata.
+    if len(json.dumps(session).encode())>800000:raise ValueError('This concept conversation is full. Export a proposal and start a new conversation.')
+    return concepts.view(store().save_compose_session(session))
+
+@app.post('/api/concepts/sessions')
+def create_concept_session(req:ConceptCreate):
+    now=time.time()
+    session={'id':'compose-'+uuid.uuid4().hex[:12],'template':req.template,'status':'concept_active',
+             'site':None,'messages':[],'candidates':[],'timeline':[],'cursor':-1,'created_at':now,'updated_at':now}
+    return _save_concept(session)
+@app.get('/api/concepts/sessions/latest')
+def latest_concept_session():
+    s=store().latest_compose_session(('concept_active',))
+    return {'session':concepts.view(s) if s else None}
+@app.get('/api/concepts/sessions/{id}')
+def get_concept_session(id:str):return concepts.view(_concept_session(id))
+@app.post('/api/concepts/read-site')
+def read_concept_site(req:ConceptReadRequest):
+    try:return concepts.read_site(req.attachment,req.page)
+    except RuntimeError as e:return JSONResponse(status_code=503,content={'detail':str(e),'mode':'unavailable'})
+    except ValueError:raise
+    except Exception as e:
+        log.exception('Concept site reading failed')
+        return JSONResponse(status_code=502,content={'detail':f'The site reading failed ({type(e).__name__}). Nothing was saved. Try again or import reviewed site JSON.','mode':'error'})
+@app.post('/api/concepts/validate-site')
+def validate_concept_site(req:ConceptSiteRequest):
+    if req.site is None:raise ValueError('The site file needs a boundary and its source.')
+    return concepts.SiteReading(site=req.site,notes=['Imported site data. Review the outline and its source before using it.'])
+@app.post('/api/concepts/sessions/{id}/site')
+def set_concept_site(id:str,req:ConceptSiteRequest):
+    session=_concept_session(id);session['site']=req.site.model_dump(mode='json') if req.site else None
+    session['messages'].append({'role':'assistant','text':'Site context updated. Existing concepts retain their original site snapshot.'})
+    return _save_concept(session)
+@app.post('/api/concepts/sessions/{id}/propose')
+def propose_concept(id:str,req:ConceptTurn):
+    session=_concept_session(id)
+    if len(session['candidates'])>21:raise ValueError('This conversation is full. Export a proposal and start a new concept conversation to explore further.')
+    accepted=concepts.view(session)['accepted_id']
+    base_id=req.base_candidate_id or accepted
+    current=next((c for c in session['candidates'] if c['id']==base_id and c['status']!='discarded'),None)
+    if base_id and current is None:raise KeyError('The concept to edit was not found')
+    site=concepts.SitePlan.model_validate(session['site']) if session['site'] else None
+    try:
+        reply,results=concepts.propose(req.message,site,concepts.DesignPlan.model_validate(current['plan']) if current else None,session['messages'])
+    except RuntimeError as e:return JSONResponse(status_code=503,content={'detail':str(e),'mode':'unavailable'})
+    except ValueError:raise
+    except Exception as e:
+        log.exception('Concept generation failed')
+        return JSONResponse(status_code=502,content={'detail':f'The AI design request failed ({type(e).__name__}). Your concepts are unchanged. Try again.','mode':'error'})
+    added=[concepts.candidate(p,site,r) for p,r in zip(reply.proposals,results)]
+    latest=_concept_session(id)
+    if latest['updated_at']!=session['updated_at']:raise Conflict('This concept conversation changed while the model was designing. Reload and retry.')
+    session['candidates']+=added
+    session['messages'] += [{'role':'user','text':req.message},{'role':'assistant','text':reply.reply,
+                            'questions':reply.questions,'candidate_ids':[c['id'] for c in added]}]
+    return _save_concept(session)
+@app.post('/api/concepts/sessions/{id}/accept')
+def accept_concept(id:str,req:ConceptChoice):
+    session=_concept_session(id)
+    if concepts.view(session)['accepted_id']!=req.expected_accepted_id:raise Conflict('The accepted concept changed. Reload before applying this proposal.')
+    c=next((c for c in session['candidates'] if c['id']==req.candidate_id),None)
+    if not c or c['status']=='discarded':raise KeyError('Concept candidate not found')
+    # Revalidate stored data and context; no model-authored results are trusted.
+    p=concepts.DesignPlan.model_validate(c['plan']);site=concepts.SitePlan.model_validate(c['site']) if c['site'] else None
+    if c['input_hash']!=digest({'plan':c['plan'],'site':c['site']}):raise ValueError('Concept content changed; generate a new proposal')
+    concepts.evaluate(p,site)
+    session['timeline']=session['timeline'][:session['cursor']+1]+[c['id']];session['cursor']+=1
+    return _save_concept(session)
+@app.post('/api/concepts/sessions/{id}/discard')
+def discard_concept(id:str,req:ConceptChoice):
+    session=_concept_session(id)
+    if concepts.view(session)['accepted_id']!=req.expected_accepted_id:raise Conflict('The accepted concept changed. Reload before discarding.')
+    if req.candidate_id in session['timeline']:raise Conflict('An accepted concept snapshot cannot be discarded')
+    c=next((c for c in session['candidates'] if c['id']==req.candidate_id),None)
+    if not c:raise KeyError('Concept candidate not found')
+    c['status']='discarded'
+    return _save_concept(session)
+@app.post('/api/concepts/sessions/{id}/{action}')
+def travel_concept(id:str,action:Literal['undo','redo']):
+    session=_concept_session(id);cursor=session['cursor']+(-1 if action=='undo' else 1)
+    if cursor < -1 or cursor>=len(session['timeline']):raise Conflict('No concept to '+action)
+    session['cursor']=cursor
+    return _save_concept(session)
+
 class QuickCheckRequest(Model):
     discipline:Literal['structure','fire','plumbing','electrical']='structure'
     attachment:Attachment
@@ -370,6 +478,9 @@ def permit_dxf(id:str,req:PermitRequest):
 def report(id:str):
     s=store().get(id);r=s['results'];esc=lambda x:html.escape(str(x));rows=''.join(f'<tr><td>{esc(q["name"])}</td><td>{q["net"]:.2f} {esc(q["unit"])}</td><td>{q["purchased"]:.2f}</td><td>₱{q["cost"]:,.2f}</td></tr>' for q in r['quantities']['items']);checks=''.join(f'<tr><td>{esc(c["rule_id"])}</td><td>{esc(c["status"])}</td><td>{esc(c["evidence"])}</td></tr>' for c in r['checks'])
     return f'''<!doctype html><html><head><title>BuildGraph review · {esc(s['model']['name'])}</title><style>body{{font:14px system-ui;max-width:1000px;margin:40px auto;color:#203b34}}h1{{font-size:32px}}table{{border-collapse:collapse;width:100%}}th,td{{padding:8px;text-align:left;border-bottom:1px solid #ddd}}td{{vertical-align:top}}code{{overflow-wrap:anywhere}}@media print{{button{{display:none}}body{{margin:0}}thead{{display:table-header-group}}tr{{break-inside:avoid}}}}</style></head><body><button onclick="window.print()">Print review</button><h1>BuildGraph / {esc(s['model']['name'])}</h1><p>Revision {esc(id)} · {esc(s['status'])} · Synthetic example / preliminary planning</p><p>{esc(r['structure'].get('scope','Analysis missing inputs'))}</p><p>Input hash <code>{esc(s['input_hash'])}</code><br>Result hash <code>{esc(s['result_hash'])}</code></p><h2>Estimate · ₱{r['quantities']['total']:,.2f}</h2><p>{esc(r['quantities']['catalog'])}</p><table><thead><tr><th>Item</th><th>Net</th><th>Purchased</th><th>Estimate</th></tr></thead><tbody>{rows}</tbody></table><h2>Exclusions</h2><p>{esc('; '.join(r['quantities']['exclusions']))}</p><h2>Checks & coverage</h2><table><thead><tr><th>Rule</th><th>Status</th><th>Evidence</th></tr></thead><tbody>{checks}</tbody></table><h2>Engineering inputs & provenance</h2><pre>{esc(json.dumps(s['model']['engineering'],indent=2))}</pre><p>Professional review is required for construction and approval. Partial coverage is not whole-building certification.</p></body></html>'''
+
+from .planning_api import router as planning_router
+app.include_router(planning_router(store))
 
 static=Path(__file__).resolve().parent.parent/'frontend'/'dist'
 class Frontend(StaticFiles):
